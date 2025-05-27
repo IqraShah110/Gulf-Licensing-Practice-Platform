@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GULF LICENSING EXAM FOR GENERAL PRACTITIONER</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
+   
+    <div id="main-content">
+      <h1 class="main-title">GULF LICENSING EXAM FOR GENERAL PRACTITIONER</h1>
+
+      <div class="main-navigation" id="main-nav">
+        <div class="nav-card" onclick="showSelectionModal('exam-wise')">
+          <h2>Exam-wise MCQs</h2>
+          <p>Practice MCQs from previous Gulf Licensing exams</p>
+        </div>
+        <div class="nav-card" onclick="showSelectionModal('subject-wise')">
+          <h2>Subject-wise MCQs</h2>
+          <p>Practice MCQs by medical subjects</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay"></div>
+
+    <!-- Exam-wise Selection Modal -->
+    <div id="exam-wise-modal" class="selection-modal">
+      <div class="modal-header">
+        <h2>Select Exam Month</h2>
+        <button
+          class="close-modal-btn"
+          onclick="hideSelectionModal('exam-wise-modal')"
+        >
+          &times;
+        </button>
+      </div>
+      <div class="modal-content">
+        <div class="month-grid">
+          {% for month in ['January', 'February', 'March', 'April', 'May',
+          'June', 'July', 'August', 'September', 'October', 'November',
+          'December'] %}
+          <button
+            class="month-btn {% if month == 'March' %}has-mcqs{% endif %}"
+            onclick="loadExamDate('{{ month }}')"
+          >
+            {{ month }} {% if month == 'March' %}
+            <span class="mcq-badge">Available</span>
+            {% endif %}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Subject-wise Selection Modal -->
+    <div id="subject-wise-modal" class="selection-modal">
+      <div class="modal-header">
+        <h2>Select Subject</h2>
+        <button
+          class="close-modal-btn"
+          onclick="hideSelectionModal('subject-wise-modal')"
+        >
+          &times;
+        </button>
+      </div>
+      <div class="modal-content">
+        <div id="subject-buttons">
+          <button class="subject-btn" onclick="loadSubject('Surgery')">
+            Surgery
+          </button>
+          <button class="subject-btn" onclick="loadSubject('Medicine')">
+            Medicine
+          </button>
+          <button class="subject-btn" onclick="loadSubject('Gynae')">
+            Gynae
+          </button>
+          <button class="subject-btn" onclick="loadSubject('Paeds')">
+            Paeds
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Sections -->
+    <div id="exam-wise" class="content-section"></div>
+
+    <div id="subject-wise" class="content-section">
+      <div class="stats-bar" style="display: none">
+        <span id="progress">Question 0/0</span>
+        <span id="score">Score: 0/0</span>
+      </div>
+      <div id="question-box" class="mcq-container" style="display: none">
+        <p>Select a subject to begin practice...</p>
+      </div>
+      <div id="solution-card" class="solution-card">
+        <div class="solution-header">
+          <h3>Detailed Explanation</h3>
+          <button class="close-explanation-btn" onclick="toggleExplanation()">
+            &times;
+          </button>
+        </div>
+        <div id="explanation-content" class="solution-content">
+          <!-- Explanation will be inserted here -->
+        </div>
+      </div>
+    </div>
+
+    <a href="/" class="home-link">HOME</a>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+      // Function to hide main navigation when MCQs are displayed
+      function hideMainNavigation() {
+        document.getElementById("main-nav").style.display = "none";
+        document.querySelector(".main-title").style.display = "none";
+      }
+
+      // Modify existing functions to hide main navigation
+      const originalLoadExamDate = window.loadExamDate;
+      window.loadExamDate = function (month) {
+        hideMainNavigation();
+        originalLoadExamDate(month);
+      };
+
+      const originalLoadSubject = window.loadSubject;
+      window.loadSubject = function (subject) {
+        hideMainNavigation();
+        originalLoadSubject(subject);
+      };
+    </script>
+  </body>
+</html>

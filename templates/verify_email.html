@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Email - Gulf Licensing Prep</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <h2 class="main-title">GULF LICENSING EXAM FOR GENERAL PRACTITIONER</h2>
+        <h3>Verify Your Email</h3>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('auth.verify_email') }}" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="email" value="{{ email }}">
+            
+            <div class="form-group">
+                <label for="verification_code">Enter Verification Code:</label>
+                <input type="text" id="verification_code" name="verification_code" 
+                       pattern="[0-9]{6}" maxlength="6" required
+                       placeholder="Enter 6-digit code">
+            </div>
+            
+            <button type="submit" class="auth-button">Verify Email</button>
+        </form>
+        
+        <p class="auth-link">
+            Didn't receive the code? <a href="{{ url_for('auth.resend_verification', email=email) }}">Resend Code</a>
+        </p>
+    </div>
+</body>
+</html> 
