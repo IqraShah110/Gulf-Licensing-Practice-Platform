@@ -82,7 +82,7 @@ def normalize_question(question):
     return hashlib.md5(cleaned.encode()).hexdigest()
 
 def initialize_database():
-    """Initialize the database and create necessary tables"""
+    """Initialize the database and create necessary tables - MINIMAL VERSION"""
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -94,6 +94,7 @@ def initialize_database():
                         email VARCHAR(100) UNIQUE NOT NULL,
                         password_hash VARCHAR(255) NOT NULL,
                         is_verified BOOLEAN DEFAULT TRUE,
+                        google_id VARCHAR(64) UNIQUE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
@@ -110,23 +111,30 @@ def initialize_database():
                 """)
                 print("✅ Medical subject enum type ready")
 
-                # Create MCQs table
+                # Create march25_mcqs table (the main table)
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS mcqs (
+                    CREATE TABLE IF NOT EXISTS march25_mcqs (
                         id SERIAL PRIMARY KEY,
+                        question_number VARCHAR(20),
                         question_text TEXT NOT NULL,
+                        normalized_question VARCHAR(32) UNIQUE,
                         option_a TEXT,
                         option_b TEXT,
                         option_c TEXT,
                         option_d TEXT,
                         correct_answer CHAR(1) NOT NULL,
-                        subject medical_subject NOT NULL,
-                        source VARCHAR(100),
                         explanation TEXT,
+                        subject medical_subject NOT NULL,
+                        source_file VARCHAR(100),
+                        exam_date DATE,
+                        appearance_count INTEGER DEFAULT 1,
+                        last_appearance DATE DEFAULT CURRENT_DATE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
-                print("✅ Database schema ready")
+                print("✅ march25_mcqs table ready")
+
+                print("✅ Minimal database setup completed (users + march25_mcqs only)")
 
     except Exception as e:
         print(f"Error initializing database: {e}")
@@ -177,14 +185,14 @@ def insert_mcq(mcq, source_file=None):
                 # Try to insert or update the MCQ
                 cur.execute(
                     """
-                    INSERT INTO March25_MCQs (
+                    INSERT INTO march25_mcqs (
                         question_number, question_text, normalized_question,
                         option_a, option_b, option_c, option_d,
                         correct_answer, explanation, subject, source_file, exam_date
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (normalized_question) 
                     DO UPDATE SET
-                        appearance_count = March25_MCQs.appearance_count + 1,
+                        appearance_count = march25_mcqs.appearance_count + 1,
                         last_appearance = CURRENT_DATE,
                         explanation = EXCLUDED.explanation
                     RETURNING id, appearance_count;
@@ -206,17 +214,6 @@ def insert_mcq(mcq, source_file=None):
                 )
                 mcq_id, count = cur.fetchone()
                 
-                # Record this appearance in question_history
-                if exam_date:
-                    cur.execute(
-                        """
-                        INSERT INTO question_history (mcq_id, exam_date, source_file)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (mcq_id, exam_date) DO NOTHING;
-                        """,
-                        (mcq_id, exam_date, source_file)
-                    )
-                
             conn.commit()
         print(f"✅ {'Updated' if count > 1 else 'Inserted'} MCQ {mcq['question_number']} (ID: {mcq_id}, Appearances: {count})")
         return mcq_id
@@ -225,24 +222,78 @@ def insert_mcq(mcq, source_file=None):
         return None
 
 def batch_insert_mcqs(mcqs, source_file=None):
-    """Insert multiple MCQs in a batch"""
+    """Insert multiple MCQs in a batch with detailed verification"""
     successful = 0
     failed = 0
+    failed_mcqs = []
     
-    for mcq in mcqs:
+    print(f"\n💾 Starting batch insert of {len(mcqs)} MCQs...")
+    
+    for i, mcq in enumerate(mcqs, 1):
         try:
-            if insert_mcq(mcq, source_file):
+            # Validate MCQ data before insertion
+            if not validate_mcq_data(mcq):
+                print(f"❌ [{i}/{len(mcqs)}] Invalid MCQ data for Q{mcq.get('question_number', 'Unknown')}")
+                failed += 1
+                failed_mcqs.append(f"Q{mcq.get('question_number', 'Unknown')}: Invalid data")
+                continue
+            
+            mcq_id = insert_mcq(mcq, source_file)
+            if mcq_id:
                 successful += 1
+                print(f"✅ [{i}/{len(mcqs)}] Saved Q{mcq['question_number']} (ID: {mcq_id})")
             else:
                 failed += 1
+                failed_mcqs.append(f"Q{mcq['question_number']}: Insert failed")
+                print(f"❌ [{i}/{len(mcqs)}] Failed to save Q{mcq['question_number']}")
+                
         except Exception as e:
-            print(f"❌ Error in batch insert: {e}")
+            print(f"❌ [{i}/{len(mcqs)}] Error saving Q{mcq.get('question_number', 'Unknown')}: {e}")
             failed += 1
+            failed_mcqs.append(f"Q{mcq.get('question_number', 'Unknown')}: {str(e)}")
     
-    print(f"\nBatch Insert Summary:")
+    print(f"\n📊 Batch Insert Summary:")
     print(f"✅ Successfully inserted/updated: {successful}")
     print(f"❌ Failed: {failed}")
+    
+    if failed_mcqs:
+        print(f"\n❌ Failed MCQs:")
+        for failed_mcq in failed_mcqs[:5]:  # Show first 5 failures
+            print(f"  - {failed_mcq}")
+        if len(failed_mcqs) > 5:
+            print(f"  ... and {len(failed_mcqs) - 5} more")
+    
     return successful, failed
+
+def validate_mcq_data(mcq):
+    """Validate MCQ data before insertion"""
+    required_fields = ['question_text', 'correct_answer', 'options']
+    
+    # Check required fields
+    for field in required_fields:
+        if field not in mcq or not mcq[field]:
+            print(f"⚠️ Missing required field: {field}")
+            return False
+    
+    # Check question text
+    if len(mcq['question_text'].strip()) < 10:
+        print(f"⚠️ Question text too short: {len(mcq['question_text'])} chars")
+        return False
+    
+    # Check correct answer
+    if mcq['correct_answer'] not in mcq['options']:
+        print(f"⚠️ Correct answer '{mcq['correct_answer']}' not in options")
+        return False
+    
+    # Check options
+    valid_options = ['A', 'B', 'C', 'D']
+    for opt in valid_options:
+        if opt in mcq['options'] and mcq['options'][opt]:
+            if len(mcq['options'][opt].strip()) < 2:
+                print(f"⚠️ Option {opt} too short")
+                return False
+    
+    return True
 
 def get_mcqs_by_subject(subject):
     """Retrieve MCQs for a specific subject"""
@@ -257,7 +308,7 @@ def get_mcqs_by_subject(subject):
                         option_a, option_b, option_c, option_d,
                         correct_answer, source_file, appearance_count,
                         exam_date, explanation
-                    FROM March25_MCQs 
+                    FROM march25_mcqs 
                     WHERE subject = %s
                     ORDER BY 
                         CASE 
@@ -306,7 +357,7 @@ def get_mcqs_by_exam_date(exam_date):
                         option_a, option_b, option_c, option_d,
                         correct_answer, source_file, appearance_count,
                         subject, explanation
-                    FROM March25_MCQs 
+                    FROM march25_mcqs 
                     WHERE exam_date = %s
                     ORDER BY 
                         subject,
@@ -369,7 +420,7 @@ def get_mcq_statistics():
                         MIN(exam_date) as earliest_date,
                         MAX(exam_date) as latest_date,
                         SUM(CASE WHEN appearance_count > 1 THEN 1 ELSE 0 END) as repeated_questions
-                    FROM March25_MCQs 
+                    FROM march25_mcqs  
                     GROUP BY subject
                     ORDER BY subject;
                 """)
@@ -386,7 +437,7 @@ def get_mcq_statistics():
                 # Get most repeated questions
                 cur.execute("""
                     SELECT question_number, appearance_count
-                    FROM March25_MCQs
+                    FROM march25_mcqs 
                     WHERE appearance_count > 1
                     ORDER BY appearance_count DESC
                     LIMIT 5;
@@ -401,9 +452,18 @@ def get_mcq_statistics():
     except Exception as e:
         print(f"Error getting MCQ statistics: {e}")
 
+def ensure_all_tables_exist():
+    """Ensure all required tables exist - MINIMAL VERSION"""
+    try:
+        # Initialize main database tables only
+        initialize_database()
+        print("✅ Minimal database tables are ready (users + march25_mcqs only)")
+    except Exception as e:
+        print(f"Error ensuring all tables exist: {e}")
+        raise
+
 if __name__ == "__main__":
     # Initialize the database when the script is run directly
-    initialize_database()
+    ensure_all_tables_exist()
     print("\nChecking current MCQ statistics...")
     get_mcq_statistics()
-

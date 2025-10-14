@@ -1,0 +1,29 @@
+# Deployment Environment Variables Template
+# Copy this to .env and update with your actual values
+
+# Database Configuration - UPDATE THESE FOR PRODUCTION
+DB_HOST=your-production-db-host.com
+DB_NAME=mcq_database
+DB_USER=your_db_user
+DB_PASSWORD=your_secure_password
+DB_PORT=5432
+
+# Application Security - GENERATE NEW KEYS
+SECRET_KEY=your-super-secret-key-here-make-it-long-and-random
+CSRF_SECRET_KEY=your-csrf-secret-key-here-also-random
+
+# Google OAuth - UPDATE WITH YOUR APP CREDENTIALS
+GOOGLE_CLIENT_ID=your-client-id.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+
+# Email Configuration - UPDATE WITH YOUR EMAIL SERVICE
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-specific-password
+
+# Gemini AI API
+GEMINI_API_KEY=your-gemini-api-key
+
+# Base URL for OAuth redirects - SET YOUR ACTUAL DOMAIN
+PUBLIC_BASE_URL=https://your-app-domain.com

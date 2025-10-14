@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 import json
 import time
+import io
+from PIL import Image
+import pytesseract  # For OCR
 
 # Load environment variables and configure Gemini
 load_dotenv()
@@ -11,14 +14,168 @@ api_key = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 # Use Gemini 2.0 Flash model
 model = genai.GenerativeModel("models/gemini-2.0-flash-001")
+
+def check_images_in_pdf(pdf_path, start_page=19, end_page=26):
+    """Check for images in specific pages and extract text from them"""
+    doc = fitz.open(pdf_path)
+    print(f"\n=== CHECKING FOR IMAGES IN PAGES {start_page+1} TO {end_page} ===")
+    
+    total_images = 0
+    image_texts = []
+    
+    for page_num in range(start_page, end_page):
+        page = doc[page_num]
+        print(f"\nPage {page_num + 1}:")
+        
+        # Get text content
+        text_content = page.get_text()
+        print(f"  Text content length: {len(text_content)} characters")
+        
+        # Get images on the page
+        image_list = page.get_images()
+        print(f"  Found {len(image_list)} images")
+        
+        if len(image_list) > 0:
+            print(f"  Images found on page {page_num + 1}!")
+            total_images += len(image_list)
+            
+            # Extract text from images using OCR
+            for img_index, img in enumerate(image_list):
+                try:
+                    # Get image data
+                    xref = img[0]
+                    pix = fitz.Pixmap(doc, xref)
+                    
+                    # Convert to PIL Image for OCR
+                    img_data = pix.tobytes("png")
+                    pil_image = Image.open(io.BytesIO(img_data))
+                    
+                    # Extract text using OCR
+                    ocr_text = pytesseract.image_to_string(pil_image)
+                    
+                    if ocr_text.strip():
+                        print(f"    Image {img_index + 1}: {len(ocr_text)} characters extracted")
+                        print(f"    Sample text: {ocr_text[:200]}...")
+                        image_texts.append({
+                            'page': page_num + 1,
+                            'image_index': img_index + 1,
+                            'text': ocr_text
+                        })
+                    else:
+                        print(f"    Image {img_index + 1}: No text found")
+                    
+                    pix = None  # Free memory
+                    
+                except Exception as e:
+                    print(f"    Error processing image {img_index + 1}: {str(e)}")
+        
+        # If page has very little text but contains questions, it might be image-based
+        if len(text_content) < 500 and page_num + 1 >= 20:
+            print(f"  WARNING: Page {page_num + 1} has very little text ({len(text_content)} chars) - likely image-based content")
+    
+    doc.close()
+    
+    print(f"\n=== SUMMARY ===")
+    print(f"Total images found: {total_images}")
+    print(f"Images with extracted text: {len(image_texts)}")
+    
+    return image_texts
+
+def extract_mcqs_from_images(image_texts):
+    """Extract MCQs from OCR-extracted image text"""
+    all_mcqs = []
+    
+    for img_data in image_texts:
+        print(f"\nProcessing image from page {img_data['page']}...")
+        
+        # Clean the OCR text
+        clean_text = img_data['text'].replace('\n\n', '\n').strip()
+        
+        if len(clean_text) < 50:  # Skip if too little text
+            print(f"  Skipping - too little text ({len(clean_text)} chars)")
+            continue
+        
+        print(f"  Text length: {len(clean_text)} characters")
+        
+        try:
+            # Use Gemini to extract MCQs from image text
+            response = model.generate_content("""Extract all Multiple Choice Questions (MCQs) from the given text. Follow these rules strictly:
+
+QUESTION BOUNDARY DETECTION:
+- A question ENDS when you see MCQ option patterns starting with ANY of these formats:
+  CAPITAL LETTERS: A), B), C), D) or A., B., C., D. or A-, B-, C-, D- or A:, B:, C:, D:
+  LOWERCASE LETTERS: a), b), c), d) or a., b., c., d. or a-, b-, c-, d- or a:, b:, c:, d:
+  MIXED FORMATS: (A), (B), (C), (D) or [A], [B], [C], [D] or {A}, {B}, {C}, {D}
+  PARENTHESES: (a), (b), (c), (d) or [a], [b], [c], [d] or {a}, {b}, {c}, {d}
+- The question text is everything from the question number until the first option marker
+- When you see ANY option pattern (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, etc.) on a new line, that marks the END of the question text and START of options
+- Next question starts when you see the next number (e.g., after the last option, look for next number)
+
+EXTRACTION RULES:
+1. Process ALL numbered questions (40-60).
+2. Question text = everything from number until first option marker
+3. Options = all MCQ option patterns that follow the question (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, (a), [a], {a}, B), b), B., b., B-, b-, B:, b:, (B), [B], {B}, (b), [b], {b}, C), c), C., c., C-, c-, C:, c:, (C), [C], {C}, (c), [c], {c}, D), d), D., d., D-, d-, D:, d:, (D), [D], {D}, (d), [d], {d})
+4. Look for answers marked by:
+   - "R:" or "Answer:" followed by letter
+   - Highlighted/bold/emphasized text
+   - Asterisk (*) or check mark (✓)
+   - Any visual emphasis indicating correct answer
+
+5. For each MCQ, output a JSON object:
+{
+    "question_number": "exact number as shown",
+    "question_text": "complete question text (stops at first option)",
+    "options": {
+        "A": "full text of option A",
+        "B": "full text of option B", 
+        "C": "full text of option C",
+        "D": "full text of option D"
+    },
+    "correct_answer": "A/B/C/D or null if unclear"
+}
+
+TEXT TO PROCESS:
+""" + clean_text)
+            
+            # Extract JSON from response
+            json_content = clean_json_content(response.text)
+            if json_content:
+                mcqs = json.loads(json_content)
+                if isinstance(mcqs, list):
+                    all_mcqs.extend(mcqs)
+                    print(f"  Found {len(mcqs)} MCQs from image")
+                    for mcq in mcqs:
+                        print(f"    Question {mcq['question_number']}: {mcq['question_text'][:100]}...")
+                else:
+                    all_mcqs.append(mcqs)
+                    print(f"  Found 1 MCQ from image")
+                    print(f"    Question {mcqs['question_number']}: {mcqs['question_text'][:100]}...")
+            else:
+                print(f"  No valid JSON found in image text")
+                
+        except Exception as e:
+            print(f"  Error processing image text: {str(e)}")
+    
+    return all_mcqs
+
 def create_extraction_prompt(text_content):
     return """Extract all Multiple Choice Questions (MCQs) from the given text and any accompanying images. Follow these rules strictly:
+
+QUESTION BOUNDARY DETECTION:
+- A question ENDS when you see MCQ option patterns starting with ANY of these formats:
+  CAPITAL LETTERS: A), B), C), D) or A., B., C., D. or A-, B-, C-, D- or A:, B:, C:, D:
+  LOWERCASE LETTERS: a), b), c), d) or a., b., c., d. or a-, b-, c-, d- or a:, b:, c:, d:
+  MIXED FORMATS: (A), (B), (C), (D) or [A], [B], [C], [D] or {A}, {B}, {C}, {D}
+  PARENTHESES: (a), (b), (c), (d) or [a], [b], [c], [d] or {a}, {b}, {c}, {d}
+- The question text is everything from the question number until the first option marker
+- When you see ANY option pattern (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, etc.) on a new line, that marks the END of the question text and START of options
+- Next question starts when you see the next number (e.g., after the last option, look for next number)
 
 INPUT RULES:
 - Process questions even if they are split across multiple pages (e.g., if a question starts at the bottom of one page and continues—partially or fully—on the next page).
 - Include MCQs from images as well—analyze the text within any images and treat it with equal priority as text content.
 - Only process numbered questions (e.g., "1-", "2.", "3)", etc.)
-- Only process options marked as A), B), C), D) orKO A., B., C., D.
+- Only process options marked with ANY of the patterns above (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, etc.)
 
 ANSWER EXTRACTION:
 - If an answer is explicitly given using "R:" or "Answer:", extract that.
@@ -31,7 +188,7 @@ OUTPUT FORMAT:
 Return a list of JSON objects, each containing:
 {
     "question_number": (question number),
-    "question_text": (question text only),
+    "question_text": (question text only - stops at first option),
     "options": {
         "A": (option A text),
         "B": (option B text),
@@ -103,16 +260,28 @@ def clean_question_text(question_text, question_number):
 def generate_explanation(mcq):
     """Generate a brief and focused explanation for the MCQ using Gemini"""
     try:
+        # Validate MCQ data
+        if not mcq.get('question_text') or not mcq.get('correct_answer') or not mcq.get('options'):
+            print(f"⚠️ Invalid MCQ data for explanation generation")
+            return None
+        
+        correct_answer = mcq['correct_answer']
+        if correct_answer not in mcq['options']:
+            print(f"⚠️ Correct answer '{correct_answer}' not found in options")
+            return None
+        
+        correct_option_text = mcq['options'][correct_answer]
+        
         prompt = f"""Write a medical explanation in EXACTLY two paragraphs. Use a blank line between paragraphs.
 
 Question: {mcq['question_text']}
 
 Options:
 {"".join(f"{k}) {v}\n" for k, v in mcq['options'].items())}
-Correct Answer: {mcq['correct_answer']}
+Correct Answer: {correct_answer}) {correct_option_text}
 
 FIRST PARAGRAPH (Definition):
-- Define or explain the correct option
+- Define or explain the correct option: {correct_option_text}
 - Keep it to 3-4 sentences
 - Do not mention the question or other options
 
@@ -173,7 +342,7 @@ IMPORTANT: Use a blank line between paragraphs. Do not repeat the question or us
         print(f"Error generating explanation: {str(e)}")
         return None
 
-def extract_mcqs_from_pdf(pdf_path, max_pages=None, start_page=0):
+def extract_mcqs_from_pdf(pdf_path, max_pages=50, start_page=20):
     """Extract MCQs from PDF with optional page limit and start page"""
     doc = fitz.open(pdf_path)
     all_mcqs = []
@@ -238,23 +407,35 @@ def extract_mcqs_from_pdf(pdf_path, max_pages=None, start_page=0):
                     print(f"\nProcessing chunk {(page_num - start_page)//(chunk_size - overlap) + 1}...")
                     response = model.generate_content("""Extract all Multiple Choice Questions (MCQs) from the given text. Follow these rules strictly:
 
+QUESTION BOUNDARY DETECTION:
+- A question ENDS when you see MCQ option patterns starting with ANY of these formats:
+  CAPITAL LETTERS: A), B), C), D) or A., B., C., D. or A-, B-, C-, D- or A:, B:, C:, D:
+  LOWERCASE LETTERS: a), b), c), d) or a., b., c., d. or a-, b-, c-, d- or a:, b:, c:, d:
+  MIXED FORMATS: (A), (B), (C), (D) or [A], [B], [C], [D] or {A}, {B}, {C}, {D}
+  PARENTHESES: (a), (b), (c), (d) or [a], [b], [c], [d] or {a}, {b}, {c}, {d}
+- The question text is everything from the question number until the first option marker
+- When you see ANY option pattern (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, etc.) on a new line, that marks the END of the question text and START of options
+- Next question starts when you see the next number (e.g., after the last option, look for next number)
+
+EXTRACTION RULES:
 1. Process ALL numbered questions (1-100).
-2. Include complete question text and all options.
-3. Look for answers marked by:
+2. Question text = everything from number until first option marker
+3. Options = all MCQ option patterns that follow the question (A), a), A., a., A-, a-, A:, a:, (A), [A], {A}, (a), [a], {a}, B), b), B., b., B-, b-, B:, b:, (B), [B], {B}, (b), [b], {b}, C), c), C., c., C-, c-, C:, c:, (C), [C], {C}, (c), [c], {c}, D), d), D., d., D-, d-, D:, d:, (D), [D], {D}, (d), [d], {d})
+4. Look for answers marked by:
    - "R:" or "Answer:" followed by letter
    - Highlighted/bold/emphasized text
    - Asterisk (*) or check mark (✓)
    - Any visual emphasis indicating correct answer
 
-4. For each MCQ, output a JSON object:
+5. For each MCQ, output a JSON object:
 {
     "question_number": "exact number as shown",
-    "question_text": "complete question",
+    "question_text": "complete question text (stops at first option)",
     "options": {
-        "A": "full text",
-        "B": "full text",
-        "C": "full text",
-        "D": "full text"
+        "A": "full text of option A",
+        "B": "full text of option B",
+        "C": "full text of option C", 
+        "D": "full text of option D"
     },
     "correct_answer": "A/B/C/D or null if unclear"
 }
@@ -268,7 +449,7 @@ TEXT TO PROCESS:
                         if json_content:
                             mcqs = json.loads(json_content)
                             if isinstance(mcqs, list):
-                                # Post-process MCQs to handle highlighted answers
+                                # Post-process MCQs to handle highlighted answers and normalize option formats
                                 for mcq in mcqs:
                                     if not mcq.get('correct_answer'):
                                         # Look for highlighted options
@@ -282,12 +463,36 @@ TEXT TO PROCESS:
                                             ):
                                                 mcq['correct_answer'] = opt
                                                 break
+                                    
+                                    # Normalize option formats to handle various patterns
+                                    normalized_options = {}
+                                    for key, value in mcq['options'].items():
+                                        # Remove option markers from the beginning of option text
+                                        clean_value = value
+                                        if clean_value:
+                                            # Remove common option prefixes
+                                            prefixes_to_remove = [
+                                                f"{key})", f"{key}.", f"{key}-", f"{key}:",
+                                                f"({key})", f"[{key}]", f"{{{key}}}",
+                                                f"{key.lower()})", f"{key.lower()}.", f"{key.lower()}-", f"{key.lower()}:",
+                                                f"({key.lower()})", f"[{key.lower()}]", f"{{{key.lower()}}}"
+                                            ]
+                                            for prefix in prefixes_to_remove:
+                                                if clean_value.startswith(prefix):
+                                                    clean_value = clean_value[len(prefix):].strip()
+                                                    break
+                                        normalized_options[key] = clean_value
+                                    mcq['options'] = normalized_options
                                 
                                 all_mcqs.extend(mcqs)
                                 print(f"Found {len(mcqs)} MCQs in chunk {(page_num - start_page)//(chunk_size - overlap) + 1}")
+                                # Print the extracted MCQs
+                                for mcq in mcqs:
+                                    print(f"  Question {mcq['question_number']}: {mcq['question_text'][:100]}...")
                             else:
                                 all_mcqs.append(mcqs)
                                 print(f"Found 1 MCQ in chunk {(page_num - start_page)//(chunk_size - overlap) + 1}")
+                                print(f"  Question {mcqs['question_number']}: {mcqs['question_text'][:100]}...")
                         else:
                             print(f"No valid JSON found in chunk {(page_num - start_page)//(chunk_size - overlap) + 1}")
                     except json.JSONDecodeError as e:
@@ -338,16 +543,45 @@ TEXT TO PROCESS:
     final_mcqs = list(processed_mcqs.values())
     
     # Generate explanations for MCQs with correct answers
-    print("\nGenerating explanations for MCQs...")
-    for mcq in final_mcqs:
-        if mcq['correct_answer']:
-            print(f"Generating explanation for question {mcq['question_number']}...")
-            mcq['explanation'] = generate_explanation(mcq)
+    print(f"\n🔍 Generating explanations for {len([m for m in final_mcqs if m.get('correct_answer')])} MCQs...")
+    explanation_count = 0
+    
+    for i, mcq in enumerate(final_mcqs, 1):
+        if mcq.get('correct_answer') and mcq['correct_answer'] in mcq.get('options', {}):
+            print(f"📝 [{i}/{len(final_mcqs)}] Generating explanation for Q{mcq['question_number']}...")
+            
+            try:
+                explanation = generate_explanation(mcq)
+                if explanation:
+                    mcq['explanation'] = explanation
+                    explanation_count += 1
+                    print(f"✅ Explanation generated for Q{mcq['question_number']}")
+                else:
+                    print(f"⚠️ Failed to generate explanation for Q{mcq['question_number']}")
+                    mcq['explanation'] = None
+            except Exception as e:
+                print(f"❌ Error generating explanation for Q{mcq['question_number']}: {e}")
+                mcq['explanation'] = None
+            
             # Add a small delay to avoid rate limiting
             time.sleep(2)
+        else:
+            print(f"⚠️ Skipping Q{mcq['question_number']} - no valid correct answer")
+            mcq['explanation'] = None
+    
+    print(f"✅ Successfully generated {explanation_count} explanations out of {len(final_mcqs)} MCQs")
     
     # Sort MCQs by question number before returning
     final_mcqs = sort_mcqs_by_number(final_mcqs)
+    
+    # Print final summary of extracted MCQs
+    print(f"\n=== FINAL EXTRACTION SUMMARY ===")
+    print(f"Total MCQs extracted: {len(final_mcqs)}")
+    if final_mcqs:
+        question_numbers = [mcq['question_number'] for mcq in final_mcqs]
+        print(f"Question numbers: {question_numbers}")
+        print(f"Question range: {min(question_numbers)} to {max(question_numbers)}")
+    print("=" * 40)
     
     doc.close()
     return final_mcqs, original_text
@@ -401,24 +635,8 @@ def verify_extraction(original_text, mcqs):
                 context = original_text[start_idx:start_idx + 200]
                 print(f"   Context: {context.replace('\n', ' ')}")
 
+# Example usage:
 if __name__ == "__main__":
-    # Extract MCQs from first 3 pages only
-    print("Starting MCQ extraction...")
-    mcqs, original_text = extract_mcqs_from_pdf('pdf_files/March 2025.pdf', max_pages=20)
-    print(f"\nRaw MCQs extracted: {len(mcqs)}")
-    
-    # Format MCQs for display
-    formatted_mcqs, answer_key = format_mcqs_for_display(mcqs)
-    print(f"\nSuccessfully formatted {len(formatted_mcqs)} MCQs")
-    print(f"Extracted {len(answer_key)} Answers")
-    
-    # Print answer key
-    print("\nAnswer Key:")
-    print("-" * 50)
-    for answer in answer_key:
-        print(answer)
-    
-    # Save extracted MCQs for classification
-    with open('extracted_mcqs.json', 'w', encoding='utf-8') as f:
-        json.dump(mcqs, f, indent=2, ensure_ascii=False)
-    print("\nSaved extracted MCQs to extracted_mcqs.json")
+    # Test extraction on a small range
+    mcqs, _ = extract_mcqs_from_pdf('pdf_files/March 2025.pdf', max_pages=5, start_page=0)
+    print(f"Extracted {len(mcqs)} MCQs from test pages")

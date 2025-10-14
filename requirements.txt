@@ -1,0 +1,11 @@
+PyMuPDF==1.26.4
+google-generativeai==0.8.5
+python-dotenv==1.1.1
+Pillow==10.4.0
+pytesseract==0.3.13
+Authlib==1.6.4
+Flask-WTF==1.2.2
+Flask-Mail==0.10.0
+psycopg2-binary==2.9.10
+Flask==3.1.1
+gunicorn==23.0.0

@@ -1,12 +1,12 @@
 # app.py
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from db_handler import get_mcqs_by_subject, get_mcqs_by_exam_date, get_connection, initialize_database
+from db_handler import get_mcqs_by_subject, get_mcqs_by_exam_date, get_connection, ensure_all_tables_exist
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
 from datetime import datetime
-from auth import auth, login_required
-from flask_wtf.csrf import CSRFProtect
+from auth import auth, login_required, init_oauth
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from email_handler import mail
 
 load_dotenv()
@@ -24,6 +24,19 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')  # Required for
 csrf = CSRFProtect(app)
 app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('CSRF_SECRET_KEY', 'your-csrf-secret-key-here')
 
+# Stabilize session cookies to prevent OAuth state mismatches
+PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', '')
+is_https = PUBLIC_BASE_URL.startswith('https://')
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = bool(is_https)
+try:
+    from urllib.parse import urlparse
+    host = urlparse(PUBLIC_BASE_URL).hostname if PUBLIC_BASE_URL else None
+    if host:
+        app.config['SESSION_COOKIE_DOMAIN'] = host
+except Exception:
+    pass
+
 # Configure Flask-Mail
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
@@ -35,11 +48,26 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
 # Initialize Flask-Mail
 mail.init_app(app)
 
-# Initialize database
-initialize_database()
+# Prefer HTTPS externally if PUBLIC_BASE_URL is https
+PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', '')
+if PUBLIC_BASE_URL.startswith('https://'):
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Initialize database and ensure all tables exist
+ensure_all_tables_exist()
 
 # Register the auth blueprint
 app.register_blueprint(auth)
+
+# Initialize OAuth (Google)
+init_oauth(app)
+
+# Friendly CSRF error handling so users see a clear message on form failures
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    from flask import flash
+    flash('Your session expired or the form is invalid. Please try again.', 'error')
+    return redirect(url_for('auth.login'))
 
 def generate_explanation(question, correct_option):
     try:
@@ -89,7 +117,13 @@ def get_exam_mcqs(month):
                                 option_a, option_b, option_c, option_d,
                                 correct_answer, subject, explanation
                             FROM march25_mcqs
-                            ORDER BY subject, question_number::int
+                            ORDER BY 
+                                subject,
+                                CASE 
+                                    WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS INTEGER)
+                                    ELSE 999999
+                                END,
+                                question_number
                         """)
                         rows = cur.fetchall()
                         
@@ -124,62 +158,6 @@ def get_exam_mcqs(month):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/save_progress', methods=['POST'])
-@login_required
-def save_progress():
-    """Save user's MCQ progress"""
-    try:
-        data = request.get_json()
-        mcq_id = data.get('mcq_id')
-        user_answer = data.get('user_answer')
-        is_correct = data.get('is_correct')
-        
-        if not all([mcq_id, user_answer, is_correct is not None]):
-            return jsonify({'error': 'Missing required fields'}), 400
-            
-        user_id = session.get('user_id')
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(f"""
-                    INSERT INTO user_progress_{user_id} (mcq_id, user_answer, is_correct)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (mcq_id) DO UPDATE
-                    SET user_answer = EXCLUDED.user_answer,
-                        is_correct = EXCLUDED.is_correct,
-                        attempted_at = CURRENT_TIMESTAMP
-                """, (mcq_id, user_answer, is_correct))
-                conn.commit()
-                
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/get_user_stats')
-@login_required
-def get_user_stats():
-    """Get user's MCQ practice statistics"""
-    try:
-        user_id = session.get('user_id')
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(f"""
-                    SELECT 
-                        COUNT(*) as total_attempted,
-                        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct_answers,
-                        COUNT(DISTINCT mcq_id) as unique_questions
-                    FROM user_progress_{user_id}
-                """)
-                stats = cur.fetchone()
-                
-                return jsonify({
-                    'total_attempted': stats[0] or 0,
-                    'correct_answers': stats[1] or 0,
-                    'unique_questions': stats[2] or 0,
-                    'accuracy': round((stats[1] or 0) / (stats[0] or 1) * 100, 2)
-                })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/gemini_explanation', methods=['POST'])
 @login_required
 def gemini_explanation():
@@ -190,9 +168,51 @@ def gemini_explanation():
     explanation = generate_explanation(question, correct_option)
     return jsonify({'explanation': explanation})
 
-@app.route('/login')
-def login_page():
-    return redirect(url_for('auth.login'))
+@app.route('/get_mcqs/mock_test')
+@login_required
+def get_mock_test_mcqs():
+    """Get 10 random MCQs from each major subject for mock test"""
+    try:
+        subjects = ['Medicine', 'Gynae', 'Surgery', 'Paeds']
+        all_mcqs = []
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                for subject in subjects:
+                    cur.execute("""
+                        SELECT 
+                            id, question_number, question_text, 
+                            option_a, option_b, option_c, option_d,
+                            correct_answer, subject, explanation
+                        FROM march25_mcqs
+                        WHERE subject = %s
+                        ORDER BY RANDOM()
+                        LIMIT 10
+                    """, (subject,))
+                    rows = cur.fetchall()
+                    for row in rows:
+                        mcq = {
+                            'id': row[0],
+                            'question_number': row[1],
+                            'question_text': row[2],
+                            'options': {},
+                            'correct_answer': row[7],
+                            'subject': row[8],
+                            'explanation': row[9]
+                        }
+                        if row[3]: mcq['options']['A'] = row[3]
+                        if row[4]: mcq['options']['B'] = row[4]
+                        if row[5]: mcq['options']['C'] = row[5]
+                        if row[6]: mcq['options']['D'] = row[6]
+                        all_mcqs.append(mcq)
+        # Shuffle all_mcqs so subjects are mixed
+        import random
+        random.shuffle(all_mcqs)
+        return jsonify(all_mcqs)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    
+ 
 
 if __name__ == '__main__':
     app.run(debug=True)

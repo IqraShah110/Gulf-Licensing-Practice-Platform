@@ -1,3 +1,39 @@
+// Question formatting function for better readability
+function formatQuestionText(text) {
+  if (!text) return '';
+  
+  // Clean up common punctuation issues
+  let formatted = text
+    .replace(/,\s*,/g, ',') // Remove double commas
+    .replace(/\s+/g, ' ') // Remove extra spaces
+    .replace(/\s*,\s*/g, ', ') // Standardize comma spacing
+    .replace(/\s*\.\s*/g, '. ') // Standardize period spacing
+    .replace(/\s*\?\s*/g, '? ') // Standardize question mark spacing
+    .replace(/\s*:\s*/g, ': ') // Standardize colon spacing
+    .replace(/\s*;\s*/g, '; ') // Standardize semicolon spacing
+    .trim();
+  
+  // Add line breaks for better readability
+  formatted = formatted
+    .replace(/(\d+\.\s)/g, '\n$1') // Line break before numbered items
+    .replace(/([.!?])\s+([A-Z])/g, '$1\n\n$2') // Line break after sentences
+    .replace(/(\w+:\s)/g, '\n$1') // Line break before colons
+    .replace(/\n\s*\n/g, '\n') // Remove empty lines
+    .trim();
+  
+  return formatted;
+}
+
+// Escape HTML to prevent unintended parsing and keep original line breaks intact
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Global variables
 let currentIndex = 0;
 let currentMCQs = [];
@@ -5,242 +41,469 @@ let score = 0;
 let attempted = 0;
 let validQuestions = 0;
 let userAnswers = [];
+// Flag to track Mock Test mode (hide explanations)
+let isMockTest = false;
+
+// No-op stubs to avoid errors after removing navbar
+function hideNavigationHomeButton() {}
+function showNavigationHomeButton() {}
 
 // Add event listener for Enter key
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-        // Only trigger next question if the Next Question button is displayed
-        const nextButton = document.querySelector('.next-btn');
-        if (nextButton && nextButton.style.display === 'block') {
-            nextQuestion();
-        }
+document.addEventListener("keydown", function (event) {
+  if (event.key === "Enter") {
+    // Only trigger next question if the Next Question button is displayed
+    const nextButton = document.querySelector(".next-btn");
+    if (nextButton && nextButton.style.display === "block") {
+      nextQuestion();
     }
+  }
 });
 
 // Navigation functions
 function showSection(sectionId) {
-    // Hide all sections
-    document.querySelectorAll(".content-section").forEach((section) => {
-        section.style.display = "none";
-    });
-    // Show selected section
-    if (sectionId) {
-        const section = document.getElementById(sectionId);
-        section.style.display = "block";
-        section.style.opacity = "0";
-        
-        // Add fade-in effect
-        setTimeout(() => {
-            section.style.opacity = "1";
-            section.style.transition = "opacity 0.3s ease";
-        }, 50);
-    }
-    // Show or hide the home link based on section
-    const homeLink = document.querySelector('.home-link');
-    if (homeLink) {
-        if (sectionId === 'exam-wise' || sectionId === 'subject-wise') {
-            homeLink.style.display = 'block';
-        } else {
-            homeLink.style.display = 'none';
-        }
-    }
+  // Hide all sections
+  document.querySelectorAll(".content-section").forEach((section) => {
+    section.style.display = "none";
+  });
+  // Show selected section
+  if (sectionId) {
+    const section = document.getElementById(sectionId);
+    section.style.display = "block";
+    section.style.opacity = "0";
+
+    // Add fade-in effect
+    setTimeout(() => {
+      section.style.opacity = "1";
+      section.style.transition = "opacity 0.3s ease";
+    }, 50);
+  }
 }
 
 function resetState() {
-    currentIndex = 0;
-    currentMCQs = [];
-    score = 0;
-    attempted = 0;
-    validQuestions = 0;
-    userAnswers = [];
+  currentIndex = 0;
+  currentMCQs = [];
+  score = 0;
+  attempted = 0;
+  validQuestions = 0;
+  userAnswers = [];
 }
 
 function showMonthGrid() {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December'];
-    
-    document.getElementById("exam-wise").innerHTML = `
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  document.getElementById("exam-wise").innerHTML = `
         <h2>Select Exam Month</h2>
         <div class="month-grid">
-            ${months.map(month => `
-                <button class="month-btn ${month === 'March' ? 'has-mcqs' : ''}"
+            ${months
+              .map(
+                (month) => `
+                <button class="month-btn ${month === "March" ? "has-mcqs" : ""}"
                     onclick="loadExamDate('${month}')">
                     ${month}
-                    ${month === 'March' ? '<span class="mcq-badge">Available</span>' : ''}
+                    ${
+                      month === "March"
+                        ? '<span class="mcq-badge">Available</span>'
+                        : ""
+                    }
                 </button>
-            `).join('')}
+            `
+              )
+              .join("")}
         </div>
     `;
 }
 
 // Selection Modal Functions
 function showSelectionModal(type) {
-    const modalId = `${type}-modal`;
-    const modal = document.getElementById(modalId);
-    const overlay = document.getElementById('modal-overlay');
-    
-    // Show modal and overlay
-    modal.style.display = 'block';
-    overlay.style.display = 'block';
-    
-    // Add show class after a small delay for animation
-    setTimeout(() => {
-        modal.classList.add('show');
-        overlay.classList.add('show');
-    }, 50);
+  const modalId = `${type}-modal`;
+  const modal = document.getElementById(modalId);
+  // Ensure overlay exists even on home page
+  let overlay = document.getElementById("modal-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "modal-overlay";
+    overlay.className = "modal-overlay";
+    document.body.appendChild(overlay);
+  }
 
-    // Add click handler to close modal when clicking overlay
-    overlay.onclick = () => hideSelectionModal(modalId);
+  if (!modal) return;
+
+  // Show modal and overlay
+  modal.style.display = "block";
+  overlay.style.display = "block";
+
+  // Add show class after a small delay for animation
+  setTimeout(() => {
+    modal.classList.add("show");
+    overlay.classList.add("show");
+  }, 50);
+
+  // Add click handler to close modal when clicking overlay
+  overlay.onclick = () => hideSelectionModal(modalId);
 }
 
 function hideSelectionModal(modalId) {
-    const modal = document.getElementById(modalId);
-    const overlay = document.getElementById('modal-overlay');
-    
-    // Remove show class
-    modal.classList.remove('show');
-    overlay.classList.remove('show');
-    
-    // Hide modal and overlay after animation
-    setTimeout(() => {
-        modal.style.display = 'none';
-        overlay.style.display = 'none';
-    }, 300);
+  const modal = document.getElementById(modalId);
+  const overlay = document.getElementById("modal-overlay");
+
+  if (modal) modal.classList.remove("show");
+  if (overlay) overlay.classList.remove("show");
+
+  // Hide modal and overlay after animation
+  setTimeout(() => {
+    if (modal) modal.style.display = "none";
+    if (overlay) overlay.style.display = "none";
+  }, 300);
 }
 
 // MCQ Loading functions
+// Simple navigation state tracking
+let navigationStack = [];
+let currentNavigationState = null;
+
+// Add navigation state to stack
+function pushNavigationState(section, month, subject, questionIndex) {
+  const state = {
+    section: section,
+    month: month,
+    subject: subject,
+    questionIndex: questionIndex,
+    timestamp: Date.now()
+  };
+  
+  // Store current state
+  currentNavigationState = state;
+  
+  // Add to stack for history
+  navigationStack.push(state);
+  
+  // Keep only last 10 navigation states to prevent memory issues
+  if (navigationStack.length > 10) {
+    navigationStack.shift();
+  }
+  
+  console.log('Navigation stack:', navigationStack);
+}
+
+// Get previous navigation state without removing current
+function getPreviousNavigationState() {
+  if (navigationStack.length > 1) {
+    return navigationStack[navigationStack.length - 2];
+  }
+  return null;
+}
+
+// Show home page
+function showHomePage() {
+  // Hide all sections
+  document.getElementById("exam-wise").style.display = "none";
+  document.getElementById("subject-wise").style.display = "none";
+  
+  // Show main navigation
+  const mainNav = document.getElementById("main-nav");
+  if (mainNav) {
+    mainNav.style.display = "block";
+  }
+  
+  // Show hero section and other home elements
+  const heroSection = document.querySelector(".hero-section");
+  if (heroSection) {
+    heroSection.style.display = "block";
+  }
+  
+  // Show elements with mb-0 class
+  document.querySelectorAll(".mb-0").forEach((element) => {
+    element.style.display = "block";
+  });
+  
+  // Show navigation Home button when returning to home
+  showNavigationHomeButton();
+  
+  // Reset state
+  currentMCQs = [];
+  currentIndex = 0;
+  userAnswers = [];
+  
+  // Clear navigation stack
+  navigationStack = [];
+  
+  // Update history to home page
+  history.pushState({ page: 'home' }, '', '/');
+  
+  console.log('Returned to home page');
+}
+
+// Enhanced loadExamDate function
 async function loadExamDate(month) {
-    hideSelectionModal('exam-wise-modal');
-    updateActiveButton("month-btn", month);
-    resetState();
+  hideSelectionModal("exam-wise-modal");
+  updateActiveButton("month-btn", month);
+  resetState();
 
-    try {
-        const response = await fetch(`/get_mcqs/exam/${month}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        
-        if (!data || data.error || data.length === 0) {
-            throw new Error(data?.error || 'No MCQs available for this exam month yet.');
-        }
-
-        handleMCQData(data, month);
-        showSection('exam-wise');
-    } catch (error) {
-        console.error("Error loading exam MCQs:", error);
-        showErrorMessage(error);
+  try {
+    setLoading(true);
+    const response = await fetch(`/get_mcqs/exam/${month}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const data = await response.json();
+
+    if (!data || data.error || data.length === 0) {
+      throw new Error(
+        data?.error || "No MCQs available for this exam month yet."
+      );
+    }
+
+    isMockTest = false;
+    handleMCQData(data, month);
+    showSection("exam-wise");
+    addBackToHomeButton(); // Ensure button is shown
+    hideNavigationHomeButton(); // Hide navigation Home button
+    showToast(`Loaded ${data.length} MCQs for ${month}`, "success");
+    
+    // Add to navigation stack and update history
+    pushNavigationState('exam-wise', month, null, 0);
+    history.pushState({ page: 'exam', month: month }, '', '/exam');
+  } catch (error) {
+    console.error("Error loading exam MCQs:", error);
+    showErrorMessage(error);
+    showToast(error.message || "Failed to load MCQs", "error");
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function loadSubject(subject) {
-    hideSelectionModal('subject-wise-modal');
-    updateActiveButton("subject-btn", subject);
-    resetState();
+  hideSelectionModal("subject-wise-modal");
+  updateActiveButton("subject-btn", subject);
+  resetState();
 
-    try {
-        const response = await fetch(`/get_mcqs/${subject}`);
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
+  try {
+    setLoading(true);
+    const response = await fetch(`/get_mcqs/${subject}`);
+    const data = await response.json();
 
-        handleMCQData(data, '', subject);
-        showSection('subject-wise');
-    } catch (error) {
-        showErrorMessage(error);
+    if (data.error) {
+      throw new Error(data.error);
     }
+
+    isMockTest = false;
+    handleMCQData(data, "", subject);
+    showSection("subject-wise");
+    addBackToHomeButton(); // Ensure button is shown
+    hideNavigationHomeButton(); // Hide navigation Home button
+    showToast(`Loaded ${data.length} ${subject} MCQs`, "success");
+    
+    // Add to navigation stack and update history
+    pushNavigationState('subject-wise', null, subject, 0);
+    history.pushState({ page: 'subject', subject: subject }, '', '/subject');
+  } catch (error) {
+    showErrorMessage(error);
+    showToast(error.message || "Failed to load subject MCQs", "error");
+  } finally {
+    setLoading(false);
+  }
 }
 
-function handleMCQData(data, month = '', subject = '') {
-    console.log("Received MCQ data:", data);
-    currentMCQs = data;
-    validQuestions = currentMCQs.filter((q) => q.correct_answer).length;
-    currentIndex = 0;
-    userAnswers = new Array(currentMCQs.length).fill(null);
-    
-    setupQuestionInterface(month, subject);
-    updateStats();
-    showQuestion();
+async function startMockTest() {
+  hideSelectionModal("mock-test-modal");
+  hideMainNavigation();
+  resetState();
+  try {
+    setLoading(true);
+    const response = await fetch("/get_mcqs/mock_test");
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    isMockTest = true;
+    handleMCQData(data, "", "Mock Test");
+    showSection("subject-wise");
+    hideNavigationHomeButton(); // Hide navigation Home button
+    showToast("Mock test ready", "success");
+  } catch (error) {
+    showErrorMessage(error);
+    showToast(error.message || "Failed to start mock test", "error");
+  } finally {
+    setLoading(false);
+  }
 }
 
-function setupQuestionInterface(month = '', subject = '') {
-    const examWiseSection = document.getElementById('exam-wise');
-    const subjectWiseSection = document.getElementById('subject-wise');
-    
-    if (month) {
-        // Setup exam-wise interface
-        examWiseSection.innerHTML = `
+function handleMCQData(data, month = "", subject = "") {
+  console.log("Received MCQ data:", data);
+  currentMCQs = data;
+  validQuestions = currentMCQs.filter((q) => q.correct_answer).length;
+  currentIndex = 0;
+  userAnswers = new Array(currentMCQs.length).fill(null);
+
+  // Debug: Check explanation data in first few questions
+  console.log("Checking explanation data in first 3 questions:");
+  for (let i = 0; i < Math.min(3, currentMCQs.length); i++) {
+    const q = currentMCQs[i];
+    console.log(`Question ${i + 1}:`, {
+      id: q.id,
+      question_number: q.question_number,
+      explanation: q.explanation,
+      explanation_type: typeof q.explanation,
+      explanation_length: q.explanation ? q.explanation.length : 0
+    });
+  }
+
+  setupQuestionInterface(month, subject);
+  createExplanationModal();
+  addBackToHomeButton();
+  updateStats();
+  showQuestion();
+}
+
+function createExplanationModal() {
+  // Remove existing modal if it exists
+  const existingOverlay = document.getElementById("modal-overlay");
+  const existingCard = document.getElementById("solution-card");
+  
+  if (existingOverlay) existingOverlay.remove();
+  if (existingCard) existingCard.remove();
+  
+  // Create modal overlay
+  const overlay = document.createElement("div");
+  overlay.id = "modal-overlay";
+  overlay.className = "modal-overlay";
+  
+  // Create solution card
+  const card = document.createElement("div");
+  card.id = "solution-card";
+  card.className = "solution-card";
+  
+  card.innerHTML = `
+    <div class="solution-header">
+      <h3>Detailed Explanation</h3>
+      <button class="close-explanation-btn" onclick="toggleExplanation()">&times;</button>
+    </div>
+    <div id="explanation-content" class="solution-content">
+      <!-- Explanation will be inserted here -->
+    </div>
+  `;
+  
+  // Add to body
+  document.body.appendChild(overlay);
+  document.body.appendChild(card);
+  
+  // Add click event to overlay to close modal
+  overlay.addEventListener('click', toggleExplanation);
+  
+  console.log("Explanation modal created and added to body");
+}
+
+function addBackToHomeButton() {
+  // Show the existing back button
+  const backButton = document.getElementById("back-to-home-btn");
+  if (backButton) {
+    backButton.style.display = "block";
+    backButton.style.visibility = "visible";
+    backButton.style.opacity = "1";
+    console.log("Back to home button shown");
+    console.log("Button styles:", {
+      display: backButton.style.display,
+      visibility: backButton.style.visibility,
+      opacity: backButton.style.opacity,
+      position: window.getComputedStyle(backButton).position,
+      zIndex: window.getComputedStyle(backButton).zIndex
+    });
+  } else {
+    console.log("Back to home button not found in DOM");
+  }
+}
+
+function setupQuestionInterface(month = "", subject = "") {
+  const examWiseSection = document.getElementById("exam-wise");
+  const subjectWiseSection = document.getElementById("subject-wise");
+
+  // Fallback helper for pages that don't have selection modals (template pages)
+  function safeSwitch(type) {
+    if (typeof showSelectionModal === 'function') {
+      showSelectionModal(type);
+    } else {
+      // Navigate to home where selection is available
+      window.location.href = '/';
+    }
+  }
+
+  if (month) {
+    // Setup exam-wise interface
+    const target = examWiseSection || document.querySelector('.content-section');
+    if (!target) return;
+    target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
                     <h2 class="section-title">Exam: ${month} 2025</h2>
-                    <div class="navigation-buttons">
-                        <button onclick="showSelectionModal('subject-wise')" class="nav-btn">
+                    <div class="nav-center">
+                        <button onclick="(${safeSwitch.toString()})(\'subject-wise\')" class="nav-btn switch-btn">
                             Switch to Subject-wise MCQs
                         </button>
                     </div>
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
-                    <span id="score">Score: 0/0</span>
+                    <span id="score">Score: 0/${currentMCQs.length}</span>
                 </div>
-                <div id="question-box" class="mcq-container">
+                <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
-                </div>
-                <div id="solution-card" class="solution-card">
-                    <div class="solution-header">
-                        <h3>Detailed Explanation</h3>
-                        <button class="close-explanation-btn" onclick="toggleExplanation()">&times;</button>
-                    </div>
-                    <div id="explanation-content" class="solution-content">
-                        <!-- Explanation will be inserted here -->
-                    </div>
                 </div>
             </div>
         `;
-        
-        examWiseSection.style.display = 'block';
-        subjectWiseSection.style.display = 'none';
-    } else {
-        // Setup subject-wise interface
-        subjectWiseSection.innerHTML = `
+    if (examWiseSection && subjectWiseSection) {
+      examWiseSection.style.display = "block";
+      subjectWiseSection.style.display = "none";
+    }
+  } else {
+    // Setup subject-wise interface
+    let sectionTitle =
+      subject === "Mock Test"
+        ? `<span class="highlight">Mock Test</span> <span class="highlight">MCQs</span>`
+        : `<span class="highlight">${subject}</span> <span class="highlight">MCQs</span>`;
+    const target = subjectWiseSection || document.querySelector('.content-section');
+    if (!target) return;
+    target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
-                    <h2 class="section-title"><span class="highlight">${subject}</span> <span class="highlight">MCQs</span></h2>
-                    <div class="navigation-buttons">
-                        <button onclick="showSelectionModal('exam-wise')" class="nav-btn">
+                    <h2 class="section-title">${sectionTitle}</h2>
+                    <div class="nav-center">
+                        <button onclick="(${safeSwitch.toString()})(\'exam-wise\')" class="nav-btn switch-btn">
                             Switch to Exam-wise MCQs
                         </button>
                     </div>
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
-                    <span id="score">Score: 0/0</span>
+                    <span id="score">Score: 0/${currentMCQs.length}</span>
                 </div>
-                <div id="question-box" class="mcq-container">
+                <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
-                </div>
-                <div id="solution-card" class="solution-card">
-                    <div class="solution-header">
-                        <h3>Detailed Explanation</h3>
-                        <button class="close-explanation-btn" onclick="toggleExplanation()">&times;</button>
-                    </div>
-                    <div id="explanation-content" class="solution-content">
-                        <!-- Explanation will be inserted here -->
-                    </div>
                 </div>
             </div>
         `;
-        
-        examWiseSection.style.display = 'none';
-        subjectWiseSection.style.display = 'block';
+    if (examWiseSection && subjectWiseSection) {
+      examWiseSection.style.display = "none";
+      subjectWiseSection.style.display = "block";
     }
-    updateStats();
+  }
+  updateStats();
 }
 
 function getQuestionInterfaceHTML() {
-    return `
+  return `
         <div class="stats-bar">
             <span id="progress">Question 0/0</span>
             <span id="score">Score: 0/0</span>
@@ -263,299 +526,492 @@ function getQuestionInterfaceHTML() {
 
 // Question display and interaction functions
 function showQuestion(isReview = false) {
-    const q = currentMCQs[currentIndex];
-    if (!q) {
-        console.log("No question found at index:", currentIndex);
-        return;
-    }
-    console.log("Displaying question:", q);
+  const q = currentMCQs[currentIndex];
+  if (!q) {
+    console.log("No question found at index:", currentIndex);
+    return;
+  }
+  console.log("Displaying question:", q);
 
-    const activeSection = document.querySelector(".content-section[style*='display: block']");
-    const container = activeSection.querySelector("#question-box");
-    container.style.display = "block";
+  const activeSection = document.querySelector(
+    ".content-section[style*='display: block']"
+  );
+  const container = activeSection.querySelector("#question-box");
+  container.style.display = "block";
 
-    // Handle both old and new data structures
-    const questionText = q.question_text || q.question || '';
-    const options = q.options || {
-        'A': q.option_a,
-        'B': q.option_b,
-        'C': q.option_c,
-        'D': q.option_d
-    };
+  // Handle both old and new data structures
+  const questionText = q.question_text || q.question || "";
+  const options = q.options || {
+    A: q.option_a,
+    B: q.option_b,
+    C: q.option_c,
+    D: q.option_d,
+  };
 
-    const hasCorrectAnswer = q.correct_answer && q.correct_answer.trim() !== "";
-    const userAnswer = userAnswers[currentIndex];
+  const hasCorrectAnswer = q.correct_answer && q.correct_answer.trim() !== "";
+  const userAnswer = userAnswers[currentIndex];
 
-    const reviewHTML = isReview && userAnswer ? 
-        `<div class="review-mode">Review Mode - Your previous answer: ${userAnswer}</div>` : '';
+  const reviewHTML =
+    isReview && userAnswer
+      ? `<div class="review-mode">Review Mode - Your previous answer: ${userAnswer}</div>`
+      : "";
 
-    container.innerHTML = `
+  container.innerHTML = `
         ${reviewHTML}
-        <h3 class="question-title">Question ${currentIndex + 1}: ${questionText}</h3>
+        <div class="question-box">
+          <h4 class="question-title"><span>Question ${
+            currentIndex + 1
+          }: ${escapeHtml(questionText)}</span></h4>
+        </div>
         <div class="options-container">
-            ${Object.entries(options).map(([key, value]) => {
-                if (!value) return '';
-                let optionClass = 'option';
+            ${Object.entries(options)
+              .map(([key, value]) => {
+                if (!value) return "";
+                let optionClass = "option";
                 if (userAnswer) {
-                    if (key === userAnswer) {
-                        optionClass += userAnswer === q.correct_answer ? ' correct' : ' incorrect';
-                    }
-                    if (key === q.correct_answer) {
-                        optionClass += ' correct';
-                    }
+                  if (key === userAnswer) {
+                    optionClass +=
+                      userAnswer === q.correct_answer
+                        ? " correct"
+                        : " incorrect";
+                  }
+                  if (key === q.correct_answer) {
+                    optionClass += " correct";
+                  }
                 }
                 if (!hasCorrectAnswer) {
-                    optionClass += ' disabled';
+                  optionClass += " disabled";
                 }
-                return `<div class="${optionClass}" 
-                    onclick="${hasCorrectAnswer ? `selectOption(this, '${key}', '${q.correct_answer}')` : ''}" 
-                    ${!hasCorrectAnswer ? 'style="pointer-events: none; opacity: 0.7;"' : ''}>
-                    ${key}) ${value}
-                </div>`;
-            }).join('')}
+                return `<div class="${optionClass} ${
+                  isReview ? "disabled" : ""
+                }" 
+    ${isReview ? 'style="pointer-events: none; opacity: 0.7;"' : ""}
+    onclick="${
+      !isReview && hasCorrectAnswer
+        ? `selectOption(this, '${key}', '${q.correct_answer}')`
+        : ""
+    }">
+    <span style="margin-left: 36px;">${key}) ${value}</span>
+</div>`;
+              })
+              .join("")}
         </div>
-        ${!hasCorrectAnswer ? `
+        ${
+          !hasCorrectAnswer
+            ? `
             <div class="warning">
                 Note: This question's correct answer is not available in the database.
                 Please proceed to the next question.
             </div>
-        ` : ''}
+        `
+            : ""
+        }
+        <div id="explanation-btn-slot"></div>
         ${getNavigationHTML()}
     `;
 
-    // If no correct answer, show next button immediately
-    if (!hasCorrectAnswer) {
-        const nextButton = container.querySelector('.next-btn');
-        if (nextButton) {
-            nextButton.style.display = 'block';
-        }
+  // If no correct answer, show next button immediately
+  if (!hasCorrectAnswer) {
+    const nextButton = container.querySelector(".next-btn");
+    if (nextButton) {
+      nextButton.style.display = "block";
     }
+  }
 
-    activeSection.querySelector(".stats-bar").style.display = "block";
-    resetExplanationState();
-    
-    if (isReview && userAnswer && q.explanation) {
-        showExplanationButton();
-    }
+  activeSection.querySelector(".stats-bar").style.display = "block";
+  
+  // Render the explanation button into the slot for this question
+  renderExplanationButton();
+  
+  resetExplanationState();
 
-    updateStats();
+  updateStats();
 }
 
 function getOptionsHTML(q, isReview, userAnswer, hasCorrectAnswer) {
-    return Object.entries(q.options)
-        .map(([key, value]) => {
-            if (!value) return '';
-            
-            let buttonClass = 'option-btn';
-            if (isReview && userAnswer) {
-                if (key === userAnswer) {
-                    buttonClass += userAnswer === q.correct_answer ? ' correct' : ' incorrect';
-                } else if (key === q.correct_answer) {
-                    buttonClass += ' correct';
-                }
-                buttonClass += ' disabled';
-            }
-            
-            return `<button class="${buttonClass}" 
-                    onclick="${!isReview && hasCorrectAnswer ? `selectOption(this, '${key}', '${q.correct_answer}')` : ''}"
-                    ${isReview || !hasCorrectAnswer ? 'disabled' : ''}>
+  return Object.entries(q.options)
+    .map(([key, value]) => {
+      if (!value) return "";
+
+      let buttonClass = "option-btn";
+      if (isReview && userAnswer) {
+        if (key === userAnswer) {
+          buttonClass +=
+            userAnswer === q.correct_answer ? " correct" : " incorrect";
+        } else if (key === q.correct_answer) {
+          buttonClass += " correct";
+        }
+        buttonClass += " disabled";
+      }
+
+      return `<button class="${buttonClass}" 
+                    onclick="${
+                      !isReview && hasCorrectAnswer
+                        ? `selectOption(this, '${key}', '${q.correct_answer}')`
+                        : ""
+                    }"
+                    ${isReview || !hasCorrectAnswer ? "disabled" : ""}>
                     ${key}) ${value}
                 </button>`;
-        })
-        .join("");
+    })
+    .join("");
 }
 
 function getWarningHTML(hasCorrectAnswer) {
-    return !hasCorrectAnswer ? `
+  return !hasCorrectAnswer
+    ? `
         <div class="warning">
             Note: This question's correct answer is not available in the database.
             Please skip to the next question.
         </div>
-    ` : "";
+    `
+    : "";
 }
 
 function getNavigationHTML() {
-    return `
+  return `
         <div class="nav-buttons">
             <button class="prev-btn" onclick="previousQuestion()" 
-                ${currentIndex === 0 ? 'disabled' : ''}>
+                ${currentIndex === 0 ? "disabled" : ""} style="display: ${currentIndex === 0 ? "none" : "block"}">
                 ← Previous Question
             </button>
-            <button class="next-btn" onclick="nextQuestion()" style="display: ${userAnswers[currentIndex] !== null ? 'block' : 'none'}">
-                ${currentIndex === currentMCQs.length - 1 ? 'Show Results' : 'Next Question'} →
+            <button class="next-btn" onclick="nextQuestion()" style="display: ${
+              userAnswers[currentIndex] !== null ? "block" : "none"
+            }">
+                ${
+                  currentIndex === currentMCQs.length - 1
+                    ? "Show Results"
+                    : "Next Question"
+                } →
             </button>
         </div>
     `;
 }
 
 function selectOption(element, selected, correct) {
-    const container = element.closest('.options-container');
-    const options = container.querySelectorAll('.option');
-    
-    // Disable all options
-    options.forEach(option => {
-        option.style.pointerEvents = 'none';
+  const container = element.closest(".options-container");
+  const options = container.querySelectorAll(".option");
+
+  // Disable all options
+  options.forEach((option) => {
+    option.style.pointerEvents = "none";
+  });
+
+  // Mark user's selection
+  element.classList.add(selected === correct ? "correct" : "incorrect");
+
+  // If answer is incorrect, highlight the correct answer
+  if (selected !== correct) {
+    options.forEach((option) => {
+      const optionKey = option.textContent.split(")")[0].trim();
+      if (optionKey === correct) {
+        option.classList.add("correct");
+      }
     });
+  }
 
-    // Mark user's selection
-    element.classList.add(selected === correct ? 'correct' : 'incorrect');
-    
-    // If answer is incorrect, highlight the correct answer
-    if (selected !== correct) {
-        options.forEach(option => {
-            const optionKey = option.textContent.split(')')[0].trim();
-            if (optionKey === correct) {
-                option.classList.add('correct');
-            }
-        });
-    }
+  // Update score and user answers
+  attempted++;
+  userAnswers[currentIndex] = selected;
+  if (selected === correct) {
+    score++;
+  }
 
-    // Update score and user answers
-    attempted++;
-    userAnswers[currentIndex] = selected;
-    if (selected === correct) {
-        score++;
-    }
+  // Show the next button after selection
+  const nextButton = container
+    .closest("#question-box")
+    .querySelector(".next-btn");
+  if (nextButton) {
+    nextButton.style.display = "block";
+  }
 
-    // Show the next button after selection
-    const nextButton = container.closest('#question-box').querySelector('.next-btn');
-    if (nextButton) {
-        nextButton.style.display = 'block';
-    }
+  updateStats();
 
-    updateStats();
-    
-    // Show explanation button if explanation exists
-    const currentMCQ = currentMCQs[currentIndex];
-    if (currentMCQ.explanation) {
-        showExplanationButton();
-    }
+  // Show explanation button if explanation exists
+  const currentMCQ = currentMCQs[currentIndex];
+  if (currentMCQ.explanation) {
+    showExplanationButton();
+  }
 }
 
 // Navigation and Review functions
 function previousQuestion() {
-    if (currentIndex > 0) {
-        currentIndex--;
-        showQuestion(true);
+  if (currentIndex > 0) {
+    currentIndex--;
+    showQuestion(true);
+    
+    // Update navigation stack
+    const currentState = navigationStack[navigationStack.length - 1];
+    if (currentState) {
+      pushNavigationState(currentState.section, currentState.month, currentState.subject, currentIndex);
     }
+  }
 }
 
 function nextQuestion() {
-    if (currentIndex < currentMCQs.length - 1) {
-        currentIndex++;
-        showQuestion(userAnswers[currentIndex] !== null);
-    } else {
-        showFinalResults();
+  if (currentIndex < currentMCQs.length - 1) {
+    currentIndex++;
+    showQuestion(userAnswers[currentIndex] !== null);
+    
+    // Update navigation stack
+    const currentState = navigationStack[navigationStack.length - 1];
+    if (currentState) {
+      pushNavigationState(currentState.section, currentState.month, currentState.subject, currentIndex);
     }
+  } else {
+    showFinalResults();
+  }
 }
 
 function showFinalResults() {
-    const totalAnswered = userAnswers.filter(answer => answer !== null).length;
-    const correctAnswers = userAnswers.reduce((count, answer, index) => {
-        return count + (answer === currentMCQs[index].correct_answer ? 1 : 0);
-    }, 0);
-    
-    const container = document.querySelector(".content-section[style*='display: block']");
-    const questionBox = container.querySelector("#question-box");
-    
-    questionBox.innerHTML = `
-        <div class="main-content-container" style="text-align: center; padding: 20px;">
-            <h2 style="color: #2c3e50; margin-bottom: 30px;">Practice Complete!</h2>
-            
-            <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); margin-bottom: 30px;">
-                <div style="font-size: 1.2em; margin-bottom: 20px;">
-                    <strong style="color: #3498db;">Final Score:</strong> ${correctAnswers}/${totalAnswered}
-                </div>
-                
-                <div style="font-size: 1.2em; margin-bottom: 20px;">
-                    <strong style="color: #3498db;">Percentage:</strong> 
-                    ${totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0}%
-                </div>
-                
-                <div style="font-size: 1.2em;">
-                    <strong style="color: #3498db;">Questions Attempted:</strong> 
-                    ${totalAnswered}/${currentMCQs.length}
-                </div>
-            </div>
+  const totalAnswered = userAnswers.filter((answer) => answer !== null).length;
+  const correctAnswers = userAnswers.reduce((count, answer, index) => {
+    return count + (answer === currentMCQs[index].correct_answer ? 1 : 0);
+  }, 0);
 
-            <div class="nav-buttons" style="justify-content: center; gap: 20px;">
-                <button class="prev-btn" onclick="showAllMCQsReview()" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    Review Answers
-                </button>
-                <button onclick="location.reload()" class="nav-btn" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    Start New Practice
-                </button>
-            </div>
+  const percentage = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0;
+  const container = document.querySelector(
+    ".content-section[style*='display: block']"
+  );
+  const questionBox = container.querySelector("#question-box");
+
+  // Determine performance level and colors
+  let performanceLevel, performanceColor, performanceIcon, performanceMessage;
+  if (percentage >= 80) {
+    performanceLevel = "Excellent";
+    performanceColor = "#10b981";
+    performanceIcon = "🎉";
+    performanceMessage = "Outstanding performance!";
+  } else if (percentage >= 60) {
+    performanceLevel = "Good";
+    performanceColor = "#3b82f6";
+    performanceIcon = "👍";
+    performanceMessage = "Well done!";
+  } else if (percentage >= 40) {
+    performanceLevel = "Fair";
+    performanceColor = "#f59e0b";
+    performanceIcon = "📚";
+    performanceMessage = "Keep practicing!";
+  } else {
+    performanceLevel = "Needs Improvement";
+    performanceColor = "#ef4444";
+    performanceIcon = "💪";
+    performanceMessage = "Don't give up!";
+  }
+
+  questionBox.innerHTML = `
+    <div class="results-container">
+      <div class="results-header">
+        <h2 class="results-title">Practice Complete!</h2>
+        <p class="results-subtitle">${performanceMessage}</p>
+      </div>
+      
+      <div class="score-display">
+        <div class="score-circle" style="--score-color: ${performanceColor}; --percentage: ${percentage}">
+          <div class="score-percentage">${percentage}%</div>
+          <div class="score-label">Score</div>
         </div>
-    `;
+        
+        <div class="score-details">
+          <div class="score-item">
+            <span class="score-number" style="color: ${performanceColor}">${correctAnswers}</span>
+            <span class="score-text">Correct</span>
+          </div>
+          <div class="score-divider"></div>
+          <div class="score-item">
+            <span class="score-number">${totalAnswered}</span>
+            <span class="score-text">Total</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="performance-badge" style="background: linear-gradient(135deg, ${performanceColor}, ${performanceColor}dd)">
+        <span class="badge-text">${performanceLevel}</span>
+      </div>
+      
+      <div class="action-buttons">
+        <button class="btn-review" onclick="showAllMCQsReview()">
+          <i class="fas fa-list-check"></i>
+          <span>Review Answers</span>
+        </button>
+        <button class="btn-restart" onclick="startNewPractice()">
+          <i class="fas fa-redo"></i>
+          <span>Start New Practice</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Start new practice - reset everything and return to home
+function startNewPractice() {
+  // Reset all global variables
+  currentIndex = 0;
+  currentMCQs = [];
+  score = 0;
+  attempted = 0;
+  validQuestions = 0;
+  userAnswers = [];
+  isMockTest = false;
+  
+  // Clear navigation stack
+  navigationStack = [];
+  
+  // Hide all content sections
+  document.getElementById("exam-wise").style.display = "none";
+  document.getElementById("subject-wise").style.display = "none";
+  
+  // Show main navigation
+  const mainNav = document.getElementById("main-nav");
+  if (mainNav) {
+    mainNav.style.display = "block";
+  }
+  
+  // Show hero section and other home elements
+  const heroSection = document.querySelector(".hero-section");
+  if (heroSection) {
+    heroSection.style.display = "block";
+  }
+  
+  // Show elements with mb-0 class
+  document.querySelectorAll(".mb-0").forEach((element) => {
+    element.style.display = "block";
+  });
+  
+  // Hide back to home button
+  const backButton = document.getElementById("back-to-home-btn");
+  if (backButton) {
+    backButton.style.display = "none";
+  }
+  
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  // Update history to home page
+  history.pushState({ page: 'home' }, '', '/');
+  
+  console.log('Started new practice - returned to home page');
 }
 
 function generateReviewQuestionHTML(q, index, userAnswer) {
-    const isCorrect = userAnswer === q.correct_answer;
-    const statusClass = userAnswer ? (isCorrect ? 'correct' : 'incorrect') : '';
-    const statusText = userAnswer ? (isCorrect ? '✓ Correct' : '✗ Incorrect') : 'Not Attempted';
-    
-    return `
-        <div class="mcq-container" style="margin-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0;">Question ${index + 1}</h3>
-                <span class="${statusClass}">${statusText}</span>
-            </div>
-            <p>${q.question_text}</p>
-            <div class="options">
-                ${Object.entries(q.options).map(([key, value]) => {
-                    let optionClass = 'option-btn disabled';
-                    if (userAnswer) {
-                        if (key === userAnswer) {
-                            optionClass += userAnswer === q.correct_answer ? ' correct' : ' incorrect';
-                        } else if (key === q.correct_answer) {
-                            optionClass += ' correct';
-                        }
-                    }
-                    return `
-                        <button class="${optionClass}">
-                            ${key}) ${value}
-                        </button>
-                    `;
-                }).join('')}
-            </div>
-            ${q.explanation ? `
-                <div class="review-explanation-section">
-                    <button class="show-explanation-btn" onclick="toggleReviewExplanation(${index})">
-                        Show Explanation
-                    </button>
-                    <div id="explanation-${index}" class="explanation-content" style="display: none;">
-                        ${formatExplanation(q.explanation)}
-                    </div>
-                </div>
-            ` : ''}
+  const isCorrect = userAnswer === q.correct_answer;
+  const statusClass = userAnswer ? (isCorrect ? "correct" : "incorrect") : "unanswered";
+  const statusText = userAnswer
+    ? isCorrect
+      ? "Correct"
+      : "Incorrect"
+    : "Not Answered";
+
+  const statusIcon = userAnswer
+    ? isCorrect
+      ? "fas fa-check-circle"
+      : "fas fa-times-circle"
+    : "fas fa-question-circle";
+
+  const statusColor = userAnswer
+    ? isCorrect
+      ? "#10b981"
+      : "#ef4444"
+    : "#6b7280";
+
+  return `
+    <div class="review-question-card ${statusClass}">
+      <div class="review-question-header">
+        <div class="question-number">
+          <span class="number">${index + 1}</span>
+          <span class="label">Question</span>
         </div>
-    `;
+        <div class="status-indicator" style="--status-color: ${statusColor}">
+          <i class="${statusIcon}"></i>
+          <span class="status-text">${statusText}</span>
+        </div>
+      </div>
+      
+      <div class="review-question-content">
+        <div class="question-stem">
+          ${escapeHtml(q.question_text)}
+        </div>
+        
+        <div class="review-options-grid">
+          ${Object.entries(q.options)
+            .map(([key, value]) => {
+              if (!value) return "";
+              let optionClass = "review-option";
+              let icon = "";
+              let optionStyle = "";
+              
+              if (key === q.correct_answer) {
+                optionClass += " correct-option";
+                icon = '<i class="fas fa-check"></i>';
+                optionStyle = "background: linear-gradient(135deg, #10b981, #059669); color: white;";
+              } else if (key === userAnswer && userAnswer !== q.correct_answer) {
+                optionClass += " incorrect-option";
+                icon = '<i class="fas fa-times"></i>';
+                optionStyle = "background: linear-gradient(135deg, #ef4444, #dc2626); color: white;";
+              } else {
+                optionClass += " neutral-option";
+                optionStyle = "background: #f8fafc; color: #374151; border: 2px solid #e5e7eb;";
+              }
+              
+              return `
+                <div class="${optionClass}" style="${optionStyle}">
+                  <div class="option-content">
+                    <span class="option-key">${key}</span>
+                    <span class="option-text">${escapeHtml(value)}</span>
+                    ${icon ? `<span class="option-icon">${icon}</span>` : ''}
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+        
+        <div class="explanation-section">
+          <button class="explanation-btn" onclick="toggleReviewExplanation(${index})">
+            <i class="fas fa-lightbulb"></i>
+            <span>Show Explanation</span>
+            <i class="fas fa-chevron-down explanation-arrow"></i>
+          </button>
+          <div class="explanation-content" id="explanation-${index}" style="display: none;">
+            <div class="explanation-header">
+              <i class="fas fa-info-circle"></i>
+              <span>Explanation</span>
+            </div>
+            <div class="explanation-text">
+              ${q.explanation ? escapeHtml(q.explanation) : "No explanation available for this question."}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function toggleReviewExplanation(index) {
-    const explanationDiv = document.getElementById(`explanation-${index}`);
-    const button = explanationDiv.previousElementSibling;
-    
-    if (explanationDiv.style.display === 'none') {
-        explanationDiv.style.display = 'block';
-        button.textContent = 'Hide Explanation';
-        button.classList.add('active');
-    } else {
-        explanationDiv.style.display = 'none';
-        button.textContent = 'Show Explanation';
-        button.classList.remove('active');
-    }
+  const explanationDiv = document.getElementById(`explanation-${index}`);
+  const button = explanationDiv.previousElementSibling;
+
+  if (explanationDiv.style.display === "none") {
+    explanationDiv.style.display = "block";
+    button.textContent = "Hide Explanation";
+    button.classList.add("active");
+  } else {
+    explanationDiv.style.display = "none";
+    button.textContent = "Show Explanation";
+    button.classList.remove("active");
+  }
 }
 
 function showAllMCQsReview() {
-    const container = document.getElementById("question-box");
-    const reviewHTML = currentMCQs.map((q, index) => {
-        const userAnswer = userAnswers[index];
-        return generateReviewQuestionHTML(q, index, userAnswer);
-    }).join('');
+  const container = document.getElementById("question-box");
+  const reviewHTML = currentMCQs
+    .map((q, index) => {
+      const userAnswer = userAnswers[index];
+      return generateReviewQuestionHTML(q, index, userAnswer);
+    })
+    .join("");
 
-    container.innerHTML = `
+  container.innerHTML = `
         <div class="main-content-container" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2 style="color: #2c3e50; margin: 0;">Review All Questions</h2>
@@ -574,93 +1030,225 @@ function showAllMCQsReview() {
         </div>
     `;
 
-    // Hide stats bar during review
-    const statsBar = document.querySelector(".stats-bar");
-    if (statsBar) {
-        statsBar.style.display = "none";
-    }
+  // Hide stats bar during review
+  const statsBar = document.querySelector(".stats-bar");
+  if (statsBar) {
+    statsBar.style.display = "none";
+  }
 }
 
 // Explanation handling functions
 function toggleExplanation() {
-    const card = document.getElementById('solution-card');
-    const overlay = document.getElementById('modal-overlay');
-    const button = document.querySelector('.show-explanation-btn');
-    
-    if (card.classList.contains('show')) {
-        hideExplanation(card, overlay, button);
-    } else {
-        showExplanation(card, overlay, button);
-    }
+  console.log("toggleExplanation called");
+  const card = document.getElementById("solution-card");
+  const overlay = document.getElementById("modal-overlay");
+  const button = document.querySelector(".show-explanation-btn");
+  const explanationContent = document.getElementById("explanation-content");
+
+  console.log("Elements found:", { card, overlay, button, explanationContent });
+  console.log("Current explanation content:", explanationContent ? explanationContent.innerHTML : "Not found");
+
+  if (card.classList.contains("show")) {
+    console.log("Hiding explanation");
+    hideExplanation(card, overlay, button);
+  } else {
+    console.log("Showing explanation");
+    showExplanation(card, overlay, button);
+  }
 }
 
 function showExplanation(card, overlay, button) {
-    card.style.display = 'block';
-    overlay.style.display = 'block';
-    setTimeout(() => {
-        card.classList.add('show');
-        overlay.classList.add('show');
-    }, 50);
-    if (button) {
-        button.textContent = 'Hide Explanation';
-    }
+  console.log("showExplanation called with:", { card, overlay, button });
+  card.style.display = "block";
+  overlay.style.display = "block";
+  
+  // Ensure explanation content is populated
+  const explanationContent = document.getElementById("explanation-content");
+  const currentMCQ = currentMCQs[currentIndex];
+  
+  console.log("Explanation content element:", explanationContent);
+  console.log("Current MCQ:", currentMCQ);
+  
+  if (currentMCQ && currentMCQ.explanation) {
+    const formattedExplanation = formatExplanation(currentMCQ.explanation);
+    explanationContent.innerHTML = formattedExplanation;
+    console.log("Explanation content set in modal:", formattedExplanation);
+    console.log("Explanation content innerHTML after setting:", explanationContent.innerHTML);
+  } else {
+    // Set a test message to see if content is being displayed
+    explanationContent.innerHTML = '<div style="padding: 20px; color: red; font-weight: bold;">TEST: This is a test message to see if content is being displayed.</div>';
+    console.log("Set test content in explanation modal");
+  }
+  
+  setTimeout(() => {
+    card.classList.add("show");
+    overlay.classList.add("show");
+  }, 50);
+  if (button) {
+    button.textContent = "Hide Explanation";
+  }
 }
 
 function hideExplanation(card, overlay, button) {
-    card.classList.remove('show');
-    overlay.classList.remove('show');
-    setTimeout(() => {
-        card.style.display = 'none';
-        overlay.style.display = 'none';
-    }, 300);
-    if (button) {
-        button.textContent = 'Show Explanation';
-    }
+  card.classList.remove("show");
+  overlay.classList.remove("show");
+  setTimeout(() => {
+    card.style.display = "none";
+    overlay.style.display = "none";
+  }, 300);
+  if (button) {
+    button.textContent = "Show Explanation";
+  }
 }
 
 function showExplanationButton() {
-    const currentMCQ = currentMCQs[currentIndex];
-    if (currentMCQ.explanation) {
-        const explanationContent = document.getElementById('explanation-content');
-        const formattedExplanation = formatExplanation(currentMCQ.explanation);
-        explanationContent.innerHTML = formattedExplanation;
-        
-        if (!document.querySelector('.explanation-btn-container')) {
-            const container = document.createElement('div');
-            container.className = 'explanation-btn-container';
-            
-            const explanationBtn = document.createElement('button');
-            explanationBtn.className = 'show-explanation-btn';
-            explanationBtn.textContent = 'Show Explanation';
-            explanationBtn.onclick = toggleExplanation;
-            
-            container.appendChild(explanationBtn);
-            document.getElementById('question-box').appendChild(container);
-        }
+  const currentMCQ = currentMCQs[currentIndex];
+  console.log("showExplanationButton called for question:", currentIndex, "explanation:", currentMCQ.explanation);
+  
+  // Always target the visible section's question-box to avoid hidden placeholders
+  const activeSection = document.querySelector(".content-section[style*='display: block']");
+  const questionBox = activeSection ? activeSection.querySelector("#question-box") : null;
+  if (!questionBox) {
+    console.log("ERROR: question-box not found!");
+    return;
+  }
+  
+  // If this is the Mock Test, do not show the explanation button
+  if (isMockTest) {
+    const existingContainer = document.querySelector('.explanation-btn-container');
+    if (existingContainer) existingContainer.remove();
+    console.log('Explanation button suppressed in Mock Test mode');
+    return;
+  }
+  
+  if (currentMCQ.explanation) {
+    const explanationContent = document.getElementById("explanation-content");
+    console.log("explanationContent element:", explanationContent);
+    
+    const formattedExplanation = formatExplanation(currentMCQ.explanation);
+    console.log("formattedExplanation:", formattedExplanation);
+    
+    if (explanationContent) {
+      explanationContent.innerHTML = formattedExplanation;
     }
+
+    // Remove existing button container first
+    const existingContainer = questionBox.querySelector(".explanation-btn-container");
+    if (existingContainer) {
+      existingContainer.remove();
+      console.log("Removed existing explanation button container");
+    }
+
+    const container = document.createElement("div");
+    container.className = "explanation-btn-container";
+
+    const explanationBtn = document.createElement("button");
+    explanationBtn.className = "show-explanation-btn";
+    explanationBtn.textContent = "Show Explanation";
+    explanationBtn.onclick = toggleExplanation;
+
+    container.appendChild(explanationBtn);
+    questionBox.appendChild(container);
+    console.log("Explanation button added to DOM");
+  } else {
+    console.log("No explanation available for this question");
+    // Still show the button but with a message that no explanation is available
+    const explanationContent = document.getElementById("explanation-content");
+    if (explanationContent) {
+      explanationContent.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;"><p>No explanation is available for this question.</p></div>';
+    }
+
+    // Remove existing button container first
+    const existingContainer = questionBox.querySelector(".explanation-btn-container");
+    if (existingContainer) {
+      existingContainer.remove();
+      console.log("Removed existing explanation button container");
+    }
+
+    const container = document.createElement("div");
+    container.className = "explanation-btn-container";
+
+    const explanationBtn = document.createElement("button");
+    explanationBtn.className = "show-explanation-btn";
+    explanationBtn.textContent = "Show Explanation";
+    explanationBtn.onclick = toggleExplanation;
+
+    container.appendChild(explanationBtn);
+    questionBox.appendChild(container);
+    console.log("Explanation button added to DOM (no explanation available)");
+  }
+}
+
+// Deterministic button render that targets the current question's slot
+function renderExplanationButton() {
+  const activeSection = document.querySelector(".content-section[style*='display: block']");
+  const questionBox = activeSection ? activeSection.querySelector("#question-box") : null;
+  if (!questionBox) return;
+  const slot = questionBox.querySelector('#explanation-btn-slot');
+  if (!slot) return;
+
+  // Clear prior content in the slot only
+  slot.innerHTML = '';
+
+  // Honor Mock Test rule: no explanation button
+  if (isMockTest) return;
+
+  const currentMCQ = currentMCQs[currentIndex];
+  const hasExplanation = !!(currentMCQ && currentMCQ.explanation);
+
+  // Always render the button so users can open the modal (which may say none available)
+  const container = document.createElement('div');
+  container.className = 'explanation-btn-container';
+
+  const explanationBtn = document.createElement('button');
+  explanationBtn.className = 'show-explanation-btn';
+  explanationBtn.textContent = 'Show Explanation';
+  explanationBtn.onclick = toggleExplanation;
+
+  container.appendChild(explanationBtn);
+  slot.appendChild(container);
+
+  // Preload explanation content if present
+  const explanationContent = document.getElementById('explanation-content');
+  if (explanationContent) {
+    explanationContent.innerHTML = hasExplanation
+      ? formatExplanation(currentMCQ.explanation)
+      : '<div style="padding: 20px; text-align: center; color: #666;"><p>No explanation is available for this question.</p></div>';
+  }
 }
 
 function formatExplanation(explanation) {
-    if (!explanation) return '';
+  if (!explanation || explanation.trim() === "" || explanation === null || explanation === undefined) {
+    return '<div style="padding: 20px; text-align: center; color: #666;"><p>No explanation is available for this question.</p></div>';
+  }
 
-    try {
-        const sections = explanation.split(/\*\*[\d.]+\s+/);
-        return sections.map(section => {
-            if (!section.trim()) return '';
+  try {
+    const sections = explanation.split(/\*\*[\d.]+\s+/);
+    const result = sections
+      .map((section) => {
+        if (!section.trim()) return "";
 
-            const [title, ...content] = section.split('**');
-            if (!title || !content.length) return '';
+        const [title, ...content] = section.split("**");
+        if (!title || !content.length) return "";
 
-            return formatExplanationSection(title, content.join(''));
-        }).join('') || `<div style="overflow-wrap: break-word;">${explanation}</div>`;
-    } catch (error) {
-        console.error("Error formatting explanation:", error);
-        return `<div style="overflow-wrap: break-word;">${explanation}</div>`;
+        return formatExplanationSection(title, content.join(""));
+      })
+      .join("");
+    
+    // If no sections were found, treat the whole explanation as plain text
+    if (!result || result.trim() === "") {
+      return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${explanation}</div>`;
     }
+    
+    return result;
+  } catch (error) {
+    console.error("Error formatting explanation:", error);
+    return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${explanation}</div>`;
+  }
 }
 
 function formatExplanationSection(title, content) {
-    return `
+  return `
         <div class="explanation-section">
             <h3 class="section-header">${title.trim()}</h3>
             <div class="explanation-content">
@@ -671,51 +1259,64 @@ function formatExplanationSection(title, content) {
 }
 
 function formatExplanationContent(content) {
-    return content
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .split('\n').map(line => {
-            if (line.trim().startsWith('*')) {
-                return `<li>${line.trim().substring(1).trim()}</li>`;
-            }
-            return `<p>${line}</p>`;
-        }).join('\n')
-        .replace(/<li>.*?<\/li>(\n<li>.*?<\/li>)*/g, match => `<ul>${match}</ul>`)
-        .replace(/Key Point:/g, '<div class="key-point"><strong>Key Point:</strong>')
-        .replace(/Warning:/g, '<div class="warning-point"><strong>Warning:</strong>')
-        .replace(/\n(?=\n|$)/g, '</div>\n')
-        .replace(/\n/g, '<br>');
+  return content
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .split("\n")
+    .map((line) => {
+      if (line.trim().startsWith("*")) {
+        return `<li>${line.trim().substring(1).trim()}</li>`;
+      }
+      return `<p>${line}</p>`;
+    })
+    .join("\n")
+    .replace(/<li>.*?<\/li>(\n<li>.*?<\/li>)*/g, (match) => `<ul>${match}</ul>`)
+    .replace(
+      /Key Point:/g,
+      '<div class="key-point"><strong>Key Point:</strong>'
+    )
+    .replace(
+      /Warning:/g,
+      '<div class="warning-point"><strong>Warning:</strong>'
+    )
+    .replace(/\n(?=\n|$)/g, "</div>\n")
+    .replace(/\n/g, "<br>");
 }
 
 // Utility functions
 function updateStats() {
-    const total = currentMCQs.length;
-    const activeSection = document.querySelector(".content-section[style*='display: block']");
-    if (activeSection) {
-        const progressElement = activeSection.querySelector("#progress");
-        const scoreElement = activeSection.querySelector("#score");
-        if (progressElement) progressElement.textContent = `Question ${currentIndex + 1}/${total}`;
-        if (scoreElement) scoreElement.textContent = `Score: ${score}/${attempted}`;
-    }
+  const total = currentMCQs.length;
+  const activeSection = document.querySelector(
+    ".content-section[style*='display: block']"
+  );
+  if (activeSection) {
+    const progressElement = activeSection.querySelector("#progress");
+    const scoreElement = activeSection.querySelector("#score");
+    if (progressElement)
+      progressElement.textContent = `Question ${currentIndex + 1}/${total}`;
+    if (scoreElement) scoreElement.textContent = `Score: ${score}/${total}`;
+  }
 }
 
 function updateActiveButton(className, text) {
-    document.querySelectorAll(`.${className}`).forEach((btn) => {
-        btn.classList.remove("active");
-        if (btn.textContent.includes(text)) {
-            btn.classList.add("active");
-        }
-    });
+  document.querySelectorAll(`.${className}`).forEach((btn) => {
+    btn.classList.remove("active");
+    if (btn.textContent.includes(text)) {
+      btn.classList.add("active");
+    }
+  });
 }
 
 function showErrorMessage(error) {
-    const container = document.querySelector(".content-section[style*='block']");
-    container.innerHTML = `
+  const container = document.querySelector(".content-section[style*='block']");
+  container.innerHTML = `
         <div style="text-align: center; padding: 20px;">
             <div class="warning" style="display: inline-block; margin-bottom: 20px;">
-                ${error.message === 'Failed to fetch' ? 
-                    'Unable to connect to the server. Please check your internet connection.' :
-                    error.message}
+                ${
+                  error.message === "Failed to fetch"
+                    ? "Unable to connect to the server. Please check your internet connection."
+                    : error.message
+                }
             </div>
             <br>
             <button onclick="showSection('exam-wise')" class="nav-btn">
@@ -726,24 +1327,92 @@ function showErrorMessage(error) {
 }
 
 function resetExplanationState() {
-    const solutionCard = document.getElementById('solution-card');
-    const explanationContent = document.getElementById('explanation-content');
-    const existingContainer = document.querySelector('.explanation-btn-container');
-    
-    if (existingContainer) {
-        existingContainer.remove();
-    }
-    
-    solutionCard.classList.remove('show');
-    explanationContent.classList.remove('show');
-    solutionCard.style.display = 'none';
+  const solutionCard = document.getElementById("solution-card");
+  const explanationContent = document.getElementById("explanation-content");
+  
+  // Don't remove the explanation button container here - let it stay for the current question
+  // const existingContainer = document.querySelector(".explanation-btn-container");
+  // if (existingContainer) {
+  //   existingContainer.remove();
+  // }
+
+  solutionCard.classList.remove("show");
+  explanationContent.classList.remove("show");
+  solutionCard.style.display = "none";
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize with no section visible
-    showSection(null);
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize with no section visible
+  showSection(null);
 
-    // Add click handler to close modal when clicking overlay
-    document.getElementById('modal-overlay').addEventListener('click', toggleExplanation);
-}); 
+  // Inject toast container and global spinner
+  injectUIHelpers();
+  
+  // Create navigation bar
+  createNavigationBar();
+  
+  // Set initial history state to prevent going to login page
+  if (history.state === null) {
+    history.replaceState({ page: 'home' }, '', '/');
+  }
+});
+
+// Handle browser back button
+window.addEventListener('popstate', (event) => {
+  console.log('Browser back button pressed');
+  
+  // Check if we're currently viewing MCQs
+  const examSection = document.getElementById("exam-wise");
+  const subjectSection = document.getElementById("subject-wise");
+  
+  if (examSection && examSection.style.display !== "none") {
+    // Currently viewing exam-wise MCQs, go back to home
+    showHomePage();
+  } else if (subjectSection && subjectSection.style.display !== "none") {
+    // Currently viewing subject-wise MCQs, go back to home
+    showHomePage();
+  } else {
+    // Already at home or other page, let browser handle it
+    console.log('Already at home page');
+  }
+});
+
+// Lightweight UI helpers
+function injectUIHelpers() {
+  if (!document.getElementById("toast-container")) {
+    const toast = document.createElement("div");
+    toast.id = "toast-container";
+    toast.style.cssText = "position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:10px;";
+    document.body.appendChild(toast);
+  }
+  if (!document.getElementById("global-spinner")) {
+    const spinner = document.createElement("div");
+    spinner.id = "global-spinner";
+    spinner.style.cssText = "position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);z-index:1500;";
+    spinner.innerHTML = '<div style="width:56px;height:56px;border:6px solid #e3eaf3;border-top-color:#1565c0;border-radius:50%;animation:spin 0.8s linear infinite"></div>';
+    document.body.appendChild(spinner);
+    const style = document.createElement("style");
+    style.textContent = "@keyframes spin{to{transform:rotate(360deg)}}";
+    document.head.appendChild(style);
+  }
+}
+
+function showToast(message, type = "info", timeout = 3000) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  const bg = type === "error" ? "#fdecea" : type === "success" ? "#e8f5e9" : "#e3f2fd";
+  const border = type === "error" ? "#f5c6cb" : type === "success" ? "#c8e6c9" : "#bbdefb";
+  const color = type === "error" ? "#c0392b" : type === "success" ? "#2e7d32" : "#1565c0";
+  toast.style.cssText = `background:${bg};border:1px solid ${border};color:${color};padding:10px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);min-width:220px`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), timeout);
+}
+
+function setLoading(isLoading) {
+  const spinner = document.getElementById("global-spinner");
+  if (!spinner) return;
+  spinner.style.display = isLoading ? "flex" : "none";
+}
