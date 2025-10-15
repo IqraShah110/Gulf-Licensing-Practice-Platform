@@ -16,13 +16,15 @@ def get_connection():
         print(f"Database: {os.getenv('DB_NAME', 'mcq_db')}")
         print(f"User: {os.getenv('DB_USER', 'postgres')}")
         print(f"Port: {os.getenv('DB_PORT', '5432')}")
+        print(f"SSL Mode: {os.getenv('DB_SSLMODE', 'require')}")
         
         conn = psycopg2.connect(
             host=os.getenv("DB_HOST", "localhost"),
             dbname=os.getenv("DB_NAME", "mcq_db"),
             user=os.getenv("DB_USER", "postgres"),
             password=os.getenv("DB_PASSWORD", "yourpassword"),
-            port=os.getenv("DB_PORT", "5432")
+            port=os.getenv("DB_PORT", "5432"),
+            sslmode=os.getenv("DB_SSLMODE", "require")
         )
         print("✅ Database connection successful")
         return conn
