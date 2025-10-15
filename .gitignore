@@ -29,3 +29,4 @@ pdf_files/
 
 # Logs
 *.log
+.env
