@@ -976,7 +976,7 @@ function generateReviewQuestionHTML(q, index, userAnswer) {
               <span>Explanation</span>
             </div>
             <div class="explanation-text">
-              ${q.explanation ? escapeHtml(q.explanation) : "No explanation available for this question."}
+              ${q.explanation ? formatExplanation(q.explanation) : "No explanation available for this question."}
             </div>
           </div>
         </div>
