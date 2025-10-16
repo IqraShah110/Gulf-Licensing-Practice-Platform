@@ -262,7 +262,7 @@ async function loadExamDate(month) {
 
     if (!data || data.error || data.length === 0) {
       throw new Error(
-        data?.error || "No MCQs available for this exam month yet."
+        data?.error || "MCQs Not Available for now"
       );
     }
 
@@ -456,7 +456,6 @@ function setupQuestionInterface(month = "", subject = "") {
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
-                    <span id="score">Score: 0/${currentMCQs.length}</span>
                 </div>
                 <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
@@ -487,7 +486,6 @@ function setupQuestionInterface(month = "", subject = "") {
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
-                    <span id="score">Score: 0/${currentMCQs.length}</span>
                 </div>
                 <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
