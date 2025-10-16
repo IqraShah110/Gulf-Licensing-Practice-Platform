@@ -1021,7 +1021,7 @@ function showAllMCQsReview() {
                 ${reviewHTML}
             </div>
             <div style="text-align: center; margin-top: 30px;">
-                <button class="nav-btn" onclick="location.reload()" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <button class="nav-btn" onclick="startNewPractice()" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                     Start New Practice
                 </button>
             </div>
