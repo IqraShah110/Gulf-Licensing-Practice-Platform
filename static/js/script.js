@@ -559,9 +559,9 @@ function showQuestion(isReview = false) {
   container.innerHTML = `
         ${reviewHTML}
         <div class="question-box">
-          <h4 class="question-title"><span>Question ${
+          <h6 class="question-title"><span>Question ${
             currentIndex + 1
-          }: ${escapeHtml(questionText)}</span></h4>
+          }: ${escapeHtml(questionText)}</span></h6>
         </div>
         <div class="options-container">
             ${Object.entries(options)
@@ -801,7 +801,7 @@ function showFinalResults() {
 
   questionBox.innerHTML = `
     <div class="results-container">
-      <div class="results-header">
+        <div class="results-header">
         <h2 class="results-title">Practice Complete!</h2>
         <p class="results-subtitle">${performanceMessage}</p>
       </div>
@@ -830,7 +830,7 @@ function showFinalResults() {
       </div>
       
       <div class="action-buttons">
-        <button class="btn-review" onclick="showAllMCQsReview()">
+        <button class="btn-review" onclick="showAllMCQsReview(); document.getElementById('modal-overlay')?.classList.remove('show'); document.getElementById('solution-card')?.classList.remove('show');">
           <i class="fas fa-list-check"></i>
           <span>Review Answers</span>
         </button>
