@@ -1,3 +1,17 @@
+/* Responsive styles for simplified mock results and review */
+.review-item { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin-bottom:12px; }
+.review-qnum { font-weight:600; color:#1f2937; margin-bottom:8px; }
+.review-qtext { color:#374151; margin-bottom:10px; }
+.review-options { display:grid; gap:8px; }
+.review-option { border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; }
+.review-option.neutral { background:#f9fafb; color:#374151; }
+.review-option.correct { background:#ecfdf5; color:#065f46; border-color:#86efac; }
+.review-option.chosen-wrong { background:#fef2f2; color:#7f1d1d; border-color:#fecaca; }
+
+@media (max-width: 480px) {
+  .review-item { padding:12px; }
+  .review-option { padding:8px 10px; }
+}
 /* Global Styles */
 :root {
   --primary-font: "Roboto", Arial, sans-serif;
@@ -368,15 +382,24 @@ body {
   height: auto;
 }
 
+/* Clean white question box and larger stem */
+.clean-white { background: #ffffff; border-left-color: #1d4ed8; }
+.larger-stem { font-size: 1.15em; }
+
+/* Evenly spaced options with radio buttons */
+.even-options .option { display:flex; gap:12px; align-items:center; padding-left:16px; }
+.even-options .option input[type="radio"] { width:16px; height:16px; accent-color:#1d4ed8; }
+.even-options .option .option-text { margin-left: 4px; }
+
 /* Removed duplicate question-title definition - using the improved version below */
 
 .question-title::before { content: none; }
 
 .question-title span {
   display: block;
-  margin-left: 40px;
-  margin-top: 4px;
-  padding-right: 20px;
+  margin-left: 0;
+  margin-top: 0;
+  padding-right: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
   position: relative;
@@ -558,7 +581,17 @@ body {
   position: relative;
   z-index: 1;
   flex-shrink: 0;
+  font-size: 1.45rem;
 }
+
+/* Timer appearance */
+#timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  color: #1d4ed8;
+}
+
+/* Left question panel removed */
 
 .stats-bar span {
   font-weight: 600;
@@ -1990,12 +2023,12 @@ html {
 }
 /* Question Title - Improved Formatting */
 .question-title {
-  font-size: 1.3em;
-  font-weight: 700;
+  font-size: 1.125rem; /* ~18px */
+  font-weight: 600; /* medium-bold for stem */
   margin: 0;
-  color: #2c3e50;
+  color: #1f2937; /* higher contrast */
   line-height: 1.5;
-  padding: 20px 24px 16px 24px;
+  padding: 0;
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
   border-bottom: 1px solid #e9ecef;
   position: relative;
@@ -2019,9 +2052,9 @@ html {
   cursor: pointer;
   transition: all 0.3s ease;
   background: #fff;
-  font-size: 0.95em;
-  color: #495057;
-  font-weight: 500;
+  font-size: 1rem; /* ~16px */
+  color: #1f2937; /* higher contrast */
+  font-weight: 400; /* normal for options */
   text-align: left;
   position: relative;
   display: flex;
@@ -2078,6 +2111,14 @@ html {
 
 .back-to-home-btn:hover i {
   transform: translateX(-2px);
+}
+
+/* On tablet/desktop widths, shift Home button to the left side */
+@media (min-width: 769px) {
+  .back-to-home-btn {
+    left: 20px;
+    right: auto;
+  }
 }
 
 /* Mobile Responsive Fixes - Enhanced with Navigation Bar */

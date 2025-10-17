@@ -44,9 +44,115 @@ let userAnswers = [];
 // Flag to track Mock Test mode (hide explanations)
 let isMockTest = false;
 
-// No-op stubs to avoid errors after removing navbar
-function hideNavigationHomeButton() {}
-function showNavigationHomeButton() {}
+// Persistent state keys
+const QUIZ_STATE_KEY = "quizStateV1";
+const QUIZ_TIMER_KEY = "quizTimerV1"; // stores { remainingMs, paused, lastTick, isMockTest }
+
+let mockTimerInterval = null;
+
+// Page-lifecycle boot id (resets on full reload). Stored in sessionStorage only
+function getBootId() {
+  try {
+    let id = sessionStorage.getItem('PAGE_BOOT_ID');
+    if (!id) {
+      id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem('PAGE_BOOT_ID', id);
+    }
+    return id;
+  } catch {
+    return 'no-session';
+  }
+}
+
+// Persist and restore helpers
+function getSerializableQuizState(contextLabel) {
+  try {
+    return {
+      context: contextLabel || "",
+      currentIndex: currentIndex,
+      userAnswers: Array.isArray(userAnswers) ? userAnswers : [],
+      score: score,
+      attempted: attempted,
+      isMockTest: isMockTest,
+      currentMCQs: Array.isArray(currentMCQs) ? currentMCQs : [],
+      navigation: currentNavigationState,
+      timestamp: Date.now()
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveQuizState(contextLabel) {
+  try {
+    const payload = getSerializableQuizState(contextLabel);
+    if (!payload) return;
+    localStorage.setItem(QUIZ_STATE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // Ignore storage errors (quota/private mode)
+  }
+}
+
+function loadQuizState() {
+  try {
+    const raw = localStorage.getItem(QUIZ_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.currentMCQs)) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearQuizState() {
+  try {
+    localStorage.removeItem(QUIZ_STATE_KEY);
+  } catch (e) {
+    // ignore
+  }
+}
+
+function clearQuizTimer() {
+  try {
+    localStorage.removeItem(QUIZ_TIMER_KEY);
+  } catch (e) {
+    // ignore
+  }
+}
+
+function isPageReload() {
+  try {
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation');
+    if (nav && nav.length) {
+      return nav[0].type === 'reload';
+    }
+    // Fallback (deprecated API)
+    // 1 === TYPE_RELOAD
+    if (performance.navigation) {
+      return performance.navigation.type === 1;
+    }
+  } catch {}
+  return false;
+}
+
+// Home button visibility helpers
+function hideNavigationHomeButton() {
+  const backButton = document.getElementById("back-to-home-btn");
+  if (backButton) {
+    backButton.style.display = "none";
+    backButton.style.visibility = "hidden";
+    backButton.style.opacity = "0";
+  }
+}
+function showNavigationHomeButton() {
+  const backButton = document.getElementById("back-to-home-btn");
+  if (backButton) {
+    backButton.style.display = "block";
+    backButton.style.visibility = "visible";
+    backButton.style.opacity = "1";
+  }
+}
 
 // Add event listener for Enter key
 document.addEventListener("keydown", function (event) {
@@ -229,8 +335,8 @@ function showHomePage() {
     element.style.display = "block";
   });
   
-  // Show navigation Home button when returning to home
-  showNavigationHomeButton();
+  // Hide navigation Home button on the landing page
+  hideNavigationHomeButton();
   
   // Reset state
   currentMCQs = [];
@@ -244,6 +350,22 @@ function showHomePage() {
   history.pushState({ page: 'home' }, '', '/');
   
   console.log('Returned to home page');
+
+  // Pause mock timer if active (user navigated away)
+  try {
+    const timer = getSavedTimer();
+    if (timer) {
+      // Deduct elapsed time since last tick and then pause
+      const now = Date.now();
+      const elapsed = Math.max(0, now - (timer.lastTick || now));
+      timer.remainingMs = Math.max(0, (timer.remainingMs || 0) - elapsed);
+      timer.paused = true;
+      timer.lastTick = now;
+      localStorage.setItem(QUIZ_TIMER_KEY, JSON.stringify(timer));
+      // Mark that resuming within this session is allowed
+      try { sessionStorage.setItem('ALLOW_MOCK_RESUME', '1'); } catch {}
+    }
+  } catch {}
 }
 
 // Enhanced loadExamDate function
@@ -323,6 +445,30 @@ async function startMockTest() {
   resetState();
   try {
     setLoading(true);
+    // Resume is only allowed for in-session navigation, not on full reload
+    const allowResume = (() => { try { return sessionStorage.getItem('ALLOW_MOCK_RESUME') === '1'; } catch { return false; } })();
+    const saved = loadQuizState();
+    const savedTimer = getSavedTimer();
+    if (allowResume && saved && saved.currentMCQs && saved.currentMCQs.length && saved.isMockTest) {
+      currentMCQs = saved.currentMCQs;
+      currentIndex = Math.min(Math.max(0, saved.currentIndex || 0), saved.currentMCQs.length - 1);
+      userAnswers = Array.isArray(saved.userAnswers) ? saved.userAnswers : new Array(saved.currentMCQs.length).fill(null);
+      score = Number.isFinite(saved.score) ? saved.score : 0;
+      attempted = Number.isFinite(saved.attempted) ? saved.attempted : 0;
+      isMockTest = true;
+      setupQuestionInterface('', 'Mock Test');
+      showSection('subject-wise');
+      hideNavigationHomeButton();
+      createExplanationModal();
+      updateStats();
+      showQuestion(userAnswers[currentIndex] !== null);
+      // Resume timer from saved remaining
+      startOrResumeMockTimer(20);
+      showToast("Resumed mock test", "success");
+    } else {
+      // Ensure any stale state is cleared so test starts fresh
+      clearQuizState();
+      clearQuizTimer();
     const response = await fetch("/get_mcqs/mock_test");
     const data = await response.json();
     if (data.error) {
@@ -332,7 +478,9 @@ async function startMockTest() {
     handleMCQData(data, "", "Mock Test");
     showSection("subject-wise");
     hideNavigationHomeButton(); // Hide navigation Home button
+      startOrResumeMockTimer(20); // start 20-minute timer
     showToast("Mock test ready", "success");
+    }
   } catch (error) {
     showErrorMessage(error);
     showToast(error.message || "Failed to start mock test", "error");
@@ -366,6 +514,9 @@ function handleMCQData(data, month = "", subject = "") {
   addBackToHomeButton();
   updateStats();
   showQuestion();
+
+  // Persist after initial render
+  saveQuizState(subject ? `subject:${subject}` : month ? `month:${month}` : "direct");
 }
 
 function createExplanationModal() {
@@ -444,15 +595,18 @@ function setupQuestionInterface(month = "", subject = "") {
     // Setup exam-wise interface
     const target = examWiseSection || document.querySelector('.content-section');
     if (!target) return;
+    const switchBtnHTML = isMockTest ? '' : `
+                        <button onclick="(${safeSwitch.toString()})(\'subject-wise\')" class="nav-btn switch-btn">
+                            Switch to Subject-wise MCQs
+                        </button>`;
     target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
                     <h2 class="section-title">Exam: ${month} 2025</h2>
                     <div class="nav-center">
-                        <button onclick="(${safeSwitch.toString()})(\'subject-wise\')" class="nav-btn switch-btn">
-                            Switch to Subject-wise MCQs
-                        </button>
+                        ${switchBtnHTML}
                     </div>
+                    ${isMockTest ? `<span id="timer" style="margin-left:auto;font-weight:800;color:#374151">--:--</span>` : ''}
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
@@ -470,19 +624,22 @@ function setupQuestionInterface(month = "", subject = "") {
     // Setup subject-wise interface
     let sectionTitle =
       subject === "Mock Test"
-        ? `<span class="highlight">Mock Test</span> <span class="highlight">MCQs</span>`
+        ? `<span class="highlight">Gulf Licensing Mock Test – GP</span>`
         : `<span class="highlight">${subject}</span> <span class="highlight">MCQs</span>`;
     const target = subjectWiseSection || document.querySelector('.content-section');
     if (!target) return;
+    const switchBtnHTML = isMockTest ? '' : `
+                        <button onclick="(${safeSwitch.toString()})(\'exam-wise\')" class="nav-btn switch-btn">
+                            Switch to Exam-wise MCQs
+                        </button>`;
     target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
                     <h2 class="section-title">${sectionTitle}</h2>
                     <div class="nav-center">
-                        <button onclick="(${safeSwitch.toString()})(\'exam-wise\')" class="nav-btn switch-btn">
-                            Switch to Exam-wise MCQs
-                        </button>
+                        ${switchBtnHTML}
                     </div>
+                    ${isMockTest ? `<span id="timer" style="margin-left:auto;font-weight:800;color:#374151">--:--</span>` : ''}
                 </div>
                 <div class="stats-bar">
                     <span id="progress">Question 0/${currentMCQs.length}</span>
@@ -556,12 +713,10 @@ function showQuestion(isReview = false) {
 
   container.innerHTML = `
         ${reviewHTML}
-        <div class="question-box">
-          <h6 class="question-title"><span>Question ${
-            currentIndex + 1
-          }: ${escapeHtml(questionText)}</span></h6>
+        <div class="question-box clean-white">
+          <h6 class="question-title larger-stem"><span>${escapeHtml(questionText)}</span></h6>
         </div>
-        <div class="options-container">
+        <div class="options-container even-options">
             ${Object.entries(options)
               .map(([key, value]) => {
                 if (!value) return "";
@@ -580,16 +735,12 @@ function showQuestion(isReview = false) {
                 if (!hasCorrectAnswer) {
                   optionClass += " disabled";
                 }
-                return `<div class="${optionClass} ${
-                  isReview ? "disabled" : ""
-                }" 
-    ${isReview ? 'style="pointer-events: none; opacity: 0.7;"' : ""}
-    onclick="${
-      !isReview && hasCorrectAnswer
+                const clickable = !isReview && hasCorrectAnswer
         ? `selectOption(this, '${key}', '${q.correct_answer}')`
-        : ""
-    }">
-    <span style="margin-left: 36px;">${key}) ${value}</span>
+                  : "";
+                return `<div class="${optionClass} ${isReview ? "disabled" : ""}" onclick="${clickable}">
+                  <input type="radio" name="mcq-${currentIndex}" ${userAnswer===key?"checked":""} ${(!hasCorrectAnswer||isReview)?"disabled":""} />
+                  <span class="option-text">${key}) ${value}</span>
 </div>`;
               })
               .join("")}
@@ -730,6 +881,9 @@ function selectOption(element, selected, correct) {
   if (currentMCQ.explanation) {
     showExplanationButton();
   }
+
+  // Persist after user attempts a question
+  saveQuizState('attempt');
 }
 
 // Navigation and Review functions
@@ -743,6 +897,9 @@ function previousQuestion() {
     if (currentState) {
       pushNavigationState(currentState.section, currentState.month, currentState.subject, currentIndex);
     }
+
+    // Persist navigation change
+    saveQuizState('prev');
   }
 }
 
@@ -756,6 +913,8 @@ function nextQuestion() {
     if (currentState) {
       pushNavigationState(currentState.section, currentState.month, currentState.subject, currentIndex);
     }
+    // Persist navigation change
+    saveQuizState('next');
   } else {
     showFinalResults();
   }
@@ -773,7 +932,49 @@ function showFinalResults() {
   );
   const questionBox = container.querySelector("#question-box");
 
-  // Determine performance level and colors
+  // Hide stats score when showing results (requested)
+  try {
+    const statsBar = container.querySelector('.stats-bar');
+    const scoreStat = container.querySelector('#score');
+    if (statsBar) statsBar.style.display = 'none';
+    if (scoreStat) scoreStat.style.display = 'none';
+  } catch {}
+
+  if (isMockTest) {
+    // Simple result card for Mock Test
+    const percent = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0;
+    const timer = getSavedTimer();
+    const totalMs = 20 * 60 * 1000;
+    const remainingMs = timer && Number.isFinite(timer.remainingMs) ? timer.remainingMs : totalMs;
+    const takenMin = Math.max(0, Math.round((totalMs - remainingMs) / 60000));
+
+    questionBox.innerHTML = `
+      <div class="mock-result-card" style="max-width:min(520px, 92vw);margin:0 auto;padding:clamp(16px,2.5vw,24px);background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.08);text-align:center;">
+        <div class="mock-result-title" style="font-weight:700;color:#1f2937;margin-bottom:10px;font-size:clamp(16px,2vw,18px);">Test Result</div>
+        <div class="mock-result-label" style="color:#1f2937;margin-bottom:4px;">Score:</div>
+        <div class="mock-score" style="font-size:clamp(32px,6vw,40px);font-weight:800;color:#1e3a8a;line-height:1;">${percent}%</div>
+        <div class="mock-progress" style="height:8px;background:#e5e7eb;border-radius:9999px;margin:14px 0;overflow:hidden;">
+          <div class="mock-progress-fill" style="width:${percent}%;height:100%;background:#22c55e;"></div>
+        </div>
+        <div class="mock-meta" style="color:#374151;margin:8px 0;">${correctAnswers} out of ${currentMCQs.length}</div>
+        <div class="mock-meta-sub" style="color:#6b7280;margin:4px 0;">Time Taken: ${takenMin} minutes</div>
+        <div class="mock-actions" style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="nav-btn" onclick="showAllMCQsReview(); document.getElementById('modal-overlay')?.classList.remove('show'); document.getElementById('solution-card')?.classList.remove('show');">Review Your Answers</button>
+          <button class="nav-btn" onclick="startNewPractice()">Start New Practice</button>
+        </div>
+      </div>
+    `;
+
+    // Stop here for Mock Test customized result
+    // Hide timer
+    const timerElement = document.getElementById('timer');
+    if (timerElement) timerElement.style.display = 'none';
+    // Clear timer storage after results
+    clearQuizTimer();
+    return;
+  }
+
+  // Determine performance level and colors (non-mock)
   let performanceLevel, performanceColor, performanceIcon, performanceMessage;
   if (percentage >= 80) {
     performanceLevel = "Excellent";
@@ -839,6 +1040,14 @@ function showFinalResults() {
       </div>
     </div>
   `;
+
+  // Persist final state (so review can be resumed)
+  saveQuizState('results');
+
+  // Hide the timer when results are displayed
+  const activeSection = document.querySelector(".content-section[style*='display: block']");
+  const timerElement = activeSection ? activeSection.querySelector('#timer') : null;
+  if (timerElement) timerElement.style.display = 'none';
 }
 
 // Start new practice - reset everything and return to home
@@ -889,6 +1098,9 @@ function startNewPractice() {
   history.pushState({ page: 'home' }, '', '/');
   
   console.log('Started new practice - returned to home page');
+
+  // Clear persisted quiz state on full reset
+  clearQuizState();
 }
 
 function generateReviewQuestionHTML(q, index, userAnswer) {
@@ -1005,7 +1217,24 @@ function showAllMCQsReview() {
   const reviewHTML = currentMCQs
     .map((q, index) => {
       const userAnswer = userAnswers[index];
-      return generateReviewQuestionHTML(q, index, userAnswer);
+      return `
+        <div class="review-item" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="font-weight:600;color:#1f2937;margin-bottom:8px;">Q${index + 1}</div>
+          <div style="color:#374151;margin-bottom:10px;">${escapeHtml(q.question_text)}</div>
+          <div style="display:grid;gap:8px;">
+            ${Object.entries(q.options).map(([key,value])=>{
+              if(!value) return '';
+              const isCorrect = key === q.correct_answer;
+              const isChosen = key === userAnswer;
+              const base = 'border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;';
+              const muted = 'background:#f9fafb;color:#374151;';
+              const correct = 'background:#ecfdf5;color:#065f46;border-color:#86efac;';
+              const chosenWrong = 'background:#fef2f2;color:#7f1d1d;border-color:#fecaca;';
+              const style = isCorrect ? correct : (isChosen && !isCorrect ? chosenWrong : muted);
+              return `<div style="${base}${style}"><strong>${key})</strong> ${escapeHtml(value)}</div>`;
+            }).join('')}
+          </div>
+        </div>`;
     })
     .join("");
 
@@ -1017,7 +1246,7 @@ function showAllMCQsReview() {
                     ← Back to Results
                 </button>
             </div>
-            <div style="max-width: 100%; overflow-x: hidden;">
+            <div style="max-width: 100%; overflow-x: hidden; overflow-y: auto; max-height: calc(100vh - 220px); padding-right: 8px;">
                 ${reviewHTML}
             </div>
             <div style="text-align: center; margin-top: 30px;">
@@ -1032,6 +1261,18 @@ function showAllMCQsReview() {
   const statsBar = document.querySelector(".stats-bar");
   if (statsBar) {
     statsBar.style.display = "none";
+  }
+
+  // Prevent scrolling beyond last review item (allow upward scrolling)
+  const scrollHost = container.querySelector('div[style*="overflow-y: auto"]');
+  if (scrollHost) {
+    scrollHost.addEventListener('wheel', (e) => {
+      const bottomThreshold = scrollHost.scrollHeight - scrollHost.clientHeight - 2; // allow final item to fully show
+      const atBottom = scrollHost.scrollTop >= bottomThreshold;
+      if (e.deltaY > 0 && atBottom) {
+        e.preventDefault();
+      }
+    }, { passive: false });
   }
 }
 
@@ -1191,6 +1432,11 @@ function renderExplanationButton() {
   // Honor Mock Test rule: no explanation button
   if (isMockTest) return;
 
+  // Only show the explanation button after the user has attempted this question
+  if (userAnswers[currentIndex] === null) {
+    return;
+  }
+
   const currentMCQ = currentMCQs[currentIndex];
   const hasExplanation = !!(currentMCQ && currentMCQ.explanation);
 
@@ -1290,9 +1536,17 @@ function updateStats() {
   if (activeSection) {
     const progressElement = activeSection.querySelector("#progress");
     const scoreElement = activeSection.querySelector("#score");
+    const timerElement = isMockTest ? activeSection.querySelector('#timer') : null;
     if (progressElement)
-      progressElement.textContent = `Question ${currentIndex + 1}/${total}`;
+      progressElement.textContent = `Question ${currentIndex + 1} of ${total}`;
     if (scoreElement) scoreElement.textContent = `Score: ${score}/${total}`;
+    if (timerElement && isMockTest) updateTimerUI(timerElement);
+    // Update progress bar fill
+    const barFill = activeSection.querySelector('.exam-progress-fill');
+    if (barFill && total > 0) {
+      const pct = ((currentIndex + 1) / total) * 100;
+      barFill.style.width = `${pct}%`;
+    }
   }
 }
 
@@ -1339,6 +1593,90 @@ function resetExplanationState() {
   solutionCard.style.display = "none";
 }
 
+// Mock test timer & palette helpers
+function startOrResumeMockTimer(totalMinutes) {
+  if (!isMockTest) return; // only for Mock Test
+  const totalMs = totalMinutes * 60 * 1000;
+  try {
+    let timer = getSavedTimer();
+    if (!timer || !Number.isFinite(timer.remainingMs)) {
+      timer = { remainingMs: totalMs, paused: false, lastTick: Date.now(), isMockTest: true };
+    }
+    // On entering MCQs view, ensure timer is running (unpause)
+    const now = Date.now();
+    if (!timer.paused) {
+      const elapsed = Math.max(0, now - (timer.lastTick || now));
+      timer.remainingMs = Math.max(0, timer.remainingMs - elapsed);
+    }
+    timer.paused = false;
+    timer.lastTick = now;
+    localStorage.setItem(QUIZ_TIMER_KEY, JSON.stringify(timer));
+  } catch {}
+
+  if (mockTimerInterval) clearInterval(mockTimerInterval);
+  mockTimerInterval = setInterval(() => tickTimer(), 1000);
+  tickTimer();
+}
+
+function tickTimer() {
+  if (!isMockTest) return; // only for Mock Test
+  const activeSection = document.querySelector(".content-section[style*='display: block']");
+  const timerElement = activeSection ? activeSection.querySelector('#timer') : null;
+  updateTimerUI(timerElement);
+}
+
+function updateTimerUI(timerElement) {
+  try {
+    if (!isMockTest) return; // only for Mock Test
+    let timer = getSavedTimer();
+    if (!timer) {
+      if (timerElement) timerElement.textContent = 'Time Remaining: --:--:--';
+      return;
+    }
+    const now = Date.now();
+    if (!timer.paused) {
+      const elapsed = Math.max(0, now - (timer.lastTick || now));
+      timer.remainingMs = Math.max(0, timer.remainingMs - elapsed);
+      timer.lastTick = now;
+      localStorage.setItem(QUIZ_TIMER_KEY, JSON.stringify(timer));
+    }
+    let remainingMs = timer.remainingMs;
+    if (remainingMs <= 0) {
+      if (timerElement) {
+        timerElement.textContent = 'Time Remaining: 00:00:00';
+        timerElement.style.color = '#ef4444';
+      }
+      clearInterval(mockTimerInterval);
+      // Auto-submit
+      showFinalResults();
+      // Clear timer so it doesn't resume after submission
+      localStorage.removeItem(QUIZ_TIMER_KEY);
+      return;
+    }
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const ss = String(totalSeconds % 60).padStart(2, '0');
+    if (timerElement) {
+      timerElement.textContent = `Time Remaining: ${hh}:${mm}:${ss}`;
+      // Turn red when under 5 minutes
+      if (totalSeconds <= 5 * 60) {
+        timerElement.style.color = '#ef4444';
+      } else {
+        timerElement.style.color = '#374151';
+      }
+    }
+  } catch {}
+}
+
+function getSavedTimer() {
+  try { return JSON.parse(localStorage.getItem(QUIZ_TIMER_KEY) || 'null'); } catch { return null; }
+}
+
+// Left question panel removed per request
+
+// Question palette removed per request
+
 // Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize with no section visible
@@ -1353,27 +1691,68 @@ document.addEventListener("DOMContentLoaded", () => {
   // Set initial history state to prevent going to login page
   if (history.state === null) {
     history.replaceState({ page: 'home' }, '', '/');
+    // Add a guard state so the first back press stays within the SPA
+    try { history.pushState({ page: 'home' }, '', '/'); } catch {}
+  }
+
+  // Always start a fresh session on page load (disable cross-reload resume)
+  try { sessionStorage.setItem('ALLOW_MOCK_RESUME', '0'); } catch {}
+  clearQuizState();
+  clearQuizTimer();
+
+  // Try restore saved quiz state (only if not a full reload)
+  const saved = null; // disabled restoration on page load to enforce fresh start
+  if (saved && saved.currentMCQs.length > 0) {
+    try {
+      currentMCQs = saved.currentMCQs;
+      currentIndex = Math.min(Math.max(0, saved.currentIndex || 0), saved.currentMCQs.length - 1);
+      userAnswers = Array.isArray(saved.userAnswers) ? saved.userAnswers : new Array(saved.currentMCQs.length).fill(null);
+      score = Number.isFinite(saved.score) ? saved.score : 0;
+      attempted = Number.isFinite(saved.attempted) ? saved.attempted : 0;
+      isMockTest = !!saved.isMockTest;
+      currentNavigationState = saved.navigation || null;
+
+      // Decide which UI to show (subject-wise/exam-wise) based on saved context
+      const context = saved.context || '';
+      if (context.startsWith('subject:')) {
+        setupQuestionInterface('', context.replace('subject:', ''));
+        showSection('subject-wise');
+      } else if (context.startsWith('month:')) {
+        setupQuestionInterface(context.replace('month:', ''), '');
+        showSection('exam-wise');
+  } else {
+        // Fallback to subject-wise container
+        setupQuestionInterface('', '');
+        showSection('subject-wise');
+      }
+
+      createExplanationModal();
+      addBackToHomeButton();
+      updateStats();
+      showQuestion(userAnswers[currentIndex] !== null);
+      // If saved timer exists and this was a mock test, do not auto-unpause here; only unpause after entering MCQs intentionally
+      if (isMockTest) {
+        const timer = getSavedTimer();
+        if (timer && timer.paused) {
+          // keep paused until user explicitly starts/resumes (e.g., via startMockTest)
+          updateTimerUI(document.querySelector('#timer'));
+        } else {
+          startOrResumeMockTimer(20);
+        }
+      }
+    } catch (e) {
+      // On any error, clear saved state
+      clearQuizState();
+    }
   }
 });
 
 // Handle browser back button
 window.addEventListener('popstate', (event) => {
   console.log('Browser back button pressed');
-  
-  // Check if we're currently viewing MCQs
-  const examSection = document.getElementById("exam-wise");
-  const subjectSection = document.getElementById("subject-wise");
-  
-  if (examSection && examSection.style.display !== "none") {
-    // Currently viewing exam-wise MCQs, go back to home
-    showHomePage();
-  } else if (subjectSection && subjectSection.style.display !== "none") {
-    // Currently viewing subject-wise MCQs, go back to home
-    showHomePage();
-  } else {
-    // Already at home or other page, let browser handle it
-    console.log('Already at home page');
-  }
+  // Immediately push a home state so further back presses stay in-app
+  try { history.pushState({ page: 'home' }, '', '/'); } catch {}
+  showHomePage(); // pauses timer via showHomePage
 });
 
 // Lightweight UI helpers

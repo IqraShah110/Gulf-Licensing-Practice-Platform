@@ -182,15 +182,47 @@
     
 <div id="mock-test-modal" class="selection-modal">
   <div class="modal-header">
-    <h2>Start Mock Test</h2>
+    <h2>MOCK TEST DETAILS</h2>
     <button class="close-modal-btn" onclick="hideSelectionModal('mock-test-modal')">
       &times;
     </button>
   </div>
   <div class="modal-content">
-    <p>This will generate a random mock test with 10 MCQs each from Medicine, Gynae, Surgery, and Paeds.</p>
-    <button class="btn btn-primary btn-hover-effect mock-start-btn" onclick="startMockTest()">
-      <i class="fas fa-bolt me-2" aria-hidden="true"></i>
+    <div style="text-align:left;">
+      <div style="margin-bottom:14px;color:#1f2937;display:grid;grid-template-columns: 180px 1fr;gap:8px 12px;align-items:center;">
+        <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">📘</span><span>Title</span></div>
+        <div>Gulf Licensing Mock Test – GP</div>
+        <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">🧮</span><span>Total Questions</span></div>
+        <div>40</div>
+        <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">⏱️</span><span>Duration</span></div>
+        <div>20 Minutes</div>
+      </div>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;">
+      <div style="margin-top:16px;margin-bottom:8px;font-weight:700;color:#1565c0;display:flex;align-items:center;gap:8px;">
+        <span aria-hidden="true">📚</span>
+        <span>SUBJECT-WISE DISTRIBUTION</span>
+      </div>
+      <ul style="margin:0;padding-left:0;color:#374151;list-style:none;">
+        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
+          <strong>Medicine</strong>
+          <span>10 Questions</span>
+        </li>
+        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
+          <strong>Surgery</strong>
+          <span>10 Questions</span>
+        </li>
+        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
+          <strong>Pediatrics</strong>
+          <span>10 Questions</span>
+        </li>
+        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
+          <strong>Gynecology</strong>
+          <span>10 Questions</span>
+        </li>
+      </ul>
+    </div>
+    <button class="btn mock-start-btn" onclick="startMockTest()" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border:none; color:white; padding: 12px 20px; border-radius:10px; box-shadow:0 8px 20px rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:10px; font-weight:600; margin-top:16px;">
+      <span aria-hidden="true">▶</span>
       <span>Start Mock Test</span>
     </button>
   </div>
