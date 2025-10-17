@@ -480,6 +480,8 @@ async function startMockTest() {
     hideNavigationHomeButton(); // Hide navigation Home button
       startOrResumeMockTimer(20); // start 20-minute timer
     showToast("Mock test ready", "success");
+      // Ensure back button always returns to SPA Home from Mock Test
+      try { history.pushState({ page: 'mock' }, '', '/mock'); } catch {}
     }
   } catch (error) {
     showErrorMessage(error);
@@ -714,7 +716,7 @@ function showQuestion(isReview = false) {
   container.innerHTML = `
         ${reviewHTML}
         <div class="question-box clean-white">
-          <h6 class="question-title larger-stem"><span>${escapeHtml(questionText)}</span></h6>
+          <h6 class="question-title larger-stem"><span><span class="question-label">Q:</span> ${escapeHtml(questionText)}</span></h6>
         </div>
         <div class="options-container even-options">
             ${Object.entries(options)
@@ -1750,7 +1752,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Handle browser back button
 window.addEventListener('popstate', (event) => {
   console.log('Browser back button pressed');
-  // Immediately push a home state so further back presses stay in-app
+  // From any state (including Mock), route to SPA Home and neutralize history
   try { history.pushState({ page: 'home' }, '', '/'); } catch {}
   showHomePage(); // pauses timer via showHomePage
 });
