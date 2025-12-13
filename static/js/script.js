@@ -216,14 +216,9 @@ function showMonthGrid() {
             ${months
               .map(
                 (month) => `
-                <button class="month-btn ${month === "March" ? "has-mcqs" : ""}"
+                <button class="month-btn"
                     onclick="loadExamDate('${month}')">
                     ${month}
-                    ${
-                      month === "March"
-                        ? '<span class="mcq-badge">Available</span>'
-                        : ""
-                    }
                 </button>
             `
               )
@@ -246,6 +241,14 @@ function showSelectionModal(type) {
   }
 
   if (!modal) return;
+
+  // Reset exam modal to year selection when opening
+  if (type === 'exam-wise') {
+    backToYearSelection();
+    // Ensure year selection is visible
+    const yearSelection = document.getElementById('year-selection');
+    if (yearSelection) yearSelection.style.display = 'flex';
+  }
 
   // Show modal and overlay
   modal.style.display = "block";
@@ -272,6 +275,10 @@ function hideSelectionModal(modalId) {
   setTimeout(() => {
     if (modal) modal.style.display = "none";
     if (overlay) overlay.style.display = "none";
+    // Reset exam modal to year selection when closed
+    if (modalId === 'exam-wise-modal') {
+      backToYearSelection();
+    }
   }, 300);
 }
 
@@ -368,36 +375,107 @@ function showHomePage() {
   } catch {}
 }
 
+// Year selection state
+let selectedExamYear = null;
+let openDropdownYear = null;
+
+// Toggle year dropdown
+function toggleYearDropdown(year) {
+  const monthsDiv = document.getElementById(`months-${year}`);
+  const chevron = document.getElementById(`chevron-${year}`);
+  
+  // Close other open dropdowns
+  if (openDropdownYear && openDropdownYear !== year) {
+    const prevMonthsDiv = document.getElementById(`months-${openDropdownYear}`);
+    const prevChevron = document.getElementById(`chevron-${openDropdownYear}`);
+    if (prevMonthsDiv) prevMonthsDiv.style.display = 'none';
+    if (prevChevron) {
+      prevChevron.classList.remove('fa-chevron-up');
+      prevChevron.classList.add('fa-chevron-down');
+    }
+  }
+  
+  // Toggle current dropdown
+  if (monthsDiv.style.display === 'none' || !monthsDiv.style.display) {
+    monthsDiv.style.display = 'grid';
+    chevron.classList.remove('fa-chevron-down');
+    chevron.classList.add('fa-chevron-up');
+    openDropdownYear = year;
+  } else {
+    monthsDiv.style.display = 'none';
+    chevron.classList.remove('fa-chevron-up');
+    chevron.classList.add('fa-chevron-down');
+    openDropdownYear = null;
+  }
+}
+
+// Back to year selection (reset all dropdowns)
+function backToYearSelection() {
+  selectedExamYear = null;
+  openDropdownYear = null;
+  // Close all dropdowns
+  [2023, 2024, 2025].forEach(year => {
+    const monthsDiv = document.getElementById(`months-${year}`);
+    const chevron = document.getElementById(`chevron-${year}`);
+    if (monthsDiv) monthsDiv.style.display = 'none';
+    if (chevron) {
+      chevron.classList.remove('fa-chevron-up');
+      chevron.classList.add('fa-chevron-down');
+    }
+  });
+}
+
+// Load exam date with year
+function loadExamDateWithYear(month, year) {
+  // Check if year is 2023 or 2024 (only 2025 has MCQs)
+  if (year === 2023 || year === 2024) {
+    hideSelectionModal('exam-wise-modal');
+    showToast(`Data for ${month} ${year} will be updated soon`, 'info', 4000);
+    backToYearSelection();
+    return;
+  }
+  
+  // Only proceed if year is 2025
+  selectedExamYear = year;
+  loadExamDate(month, year);
+}
+
 // Enhanced loadExamDate function
-async function loadExamDate(month) {
+async function loadExamDate(month, year = 2025) {
   hideSelectionModal("exam-wise-modal");
   updateActiveButton("month-btn", month);
   resetState();
+  // Reset year selection state
+  selectedExamYear = null;
 
   try {
     setLoading(true);
-    const response = await fetch(`/get_mcqs/exam/${month}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const response = await fetch(`/get_mcqs/exam/${year}/${month}`);
+    
+    // Check if response is OK and is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(`Server returned non-JSON response. Status: ${response.status}`);
     }
+    
     const data = await response.json();
 
-    if (!data || data.error || data.length === 0) {
+    if (!response.ok || !data || data.error || data.length === 0) {
       throw new Error(
-        data?.error || "MCQs Not Available for now"
+        data?.error || "This Month's MCQs will be updated soon"
       );
     }
 
     isMockTest = false;
-    handleMCQData(data, month);
+    handleMCQData(data, `${month} ${year}`);
     showSection("exam-wise");
     addBackToHomeButton(); // Ensure button is shown
     hideNavigationHomeButton(); // Hide navigation Home button
-    showToast(`Loaded ${data.length} MCQs for ${month}`, "success");
+    showToast(`Loaded ${data.length} MCQs for ${month} ${year}`, "success");
     
     // Add to navigation stack and update history
     pushNavigationState('exam-wise', month, null, 0);
-    history.pushState({ page: 'exam', month: month }, '', '/exam');
+    history.pushState({ page: 'exam', month: month, year: year }, '', '/exam');
   } catch (error) {
     console.error("Error loading exam MCQs:", error);
     showErrorMessage(error);
@@ -463,7 +541,7 @@ async function startMockTest() {
       updateStats();
       showQuestion(userAnswers[currentIndex] !== null);
       // Resume timer from saved remaining
-      startOrResumeMockTimer(20);
+      startOrResumeMockTimer(240); // 4 hours
       showToast("Resumed mock test", "success");
     } else {
       // Ensure any stale state is cleared so test starts fresh
@@ -478,7 +556,7 @@ async function startMockTest() {
     handleMCQData(data, "", "Mock Test");
     showSection("subject-wise");
     hideNavigationHomeButton(); // Hide navigation Home button
-      startOrResumeMockTimer(20); // start 20-minute timer
+      startOrResumeMockTimer(240); // start 4-hour timer
     showToast("Mock test ready", "success");
       // Ensure back button always returns to SPA Home from Mock Test
       try { history.pushState({ page: 'mock' }, '', '/mock'); } catch {}
@@ -597,6 +675,14 @@ function setupQuestionInterface(month = "", subject = "") {
     // Setup exam-wise interface
     const target = examWiseSection || document.querySelector('.content-section');
     if (!target) return;
+    // Extract year from month string if it contains year (e.g., "January 2025")
+    let displayMonth = month;
+    let displayYear = '2025';
+    if (month.includes(' ')) {
+      const parts = month.split(' ');
+      displayMonth = parts[0];
+      displayYear = parts[1] || '2025';
+    }
     const switchBtnHTML = isMockTest ? '' : `
                         <button onclick="(${safeSwitch.toString()})(\'subject-wise\')" class="nav-btn switch-btn">
                             Switch to Subject-wise MCQs
@@ -604,14 +690,11 @@ function setupQuestionInterface(month = "", subject = "") {
     target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
-                    <h2 class="section-title">Exam: ${month} 2025</h2>
+                    <h2 class="section-title">${displayMonth} ${displayYear}:<span id="stats-title">0/${currentMCQs.length}</span></h2>
                     <div class="nav-center">
                         ${switchBtnHTML}
                     </div>
                     ${isMockTest ? `<span id="timer" style="margin-left:auto;font-weight:800;color:#374151">--:--</span>` : ''}
-                </div>
-                <div class="stats-bar">
-                    <span id="progress">Question 0/${currentMCQs.length}</span>
                 </div>
                 <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
@@ -626,7 +709,7 @@ function setupQuestionInterface(month = "", subject = "") {
     // Setup subject-wise interface
     let sectionTitle =
       subject === "Mock Test"
-        ? `<span class="highlight">Gulf Licensing Mock Test – GP</span>`
+        ? `<span class="highlight">GulfCertify Mock Test – GP</span>`
         : `<span class="highlight">${subject}</span> <span class="highlight">MCQs</span>`;
     const target = subjectWiseSection || document.querySelector('.content-section');
     if (!target) return;
@@ -637,14 +720,11 @@ function setupQuestionInterface(month = "", subject = "") {
     target.innerHTML = `
             <div class="main-content-container">
                 <div class="header-container">
-                    <h2 class="section-title">${sectionTitle}</h2>
+                    <h2 class="section-title">${sectionTitle}:<span id="stats-title">0/${isMockTest ? 200 : currentMCQs.length}</span></h2>
                     <div class="nav-center">
                         ${switchBtnHTML}
                     </div>
                     ${isMockTest ? `<span id="timer" style="margin-left:auto;font-weight:800;color:#374151">--:--</span>` : ''}
-                </div>
-                <div class="stats-bar">
-                    <span id="progress">Question 0/${currentMCQs.length}</span>
                 </div>
                 <div id="question-box" class="mcq-container" style="margin: 0px;">
                     <p>Loading question...</p>
@@ -661,10 +741,6 @@ function setupQuestionInterface(month = "", subject = "") {
 
 function getQuestionInterfaceHTML() {
   return `
-        <div class="stats-bar">
-            <span id="progress">Question 0/0</span>
-            <span id="score">Score: 0/0</span>
-        </div>
         <div id="question-box" class="mcq-container">
             <p>Loading question...</p>
         </div>
@@ -723,6 +799,7 @@ function showQuestion(isReview = false) {
               .map(([key, value]) => {
                 if (!value) return "";
                 let optionClass = "option";
+                
                 if (userAnswer) {
                   if (key === userAnswer) {
                     optionClass +=
@@ -757,7 +834,6 @@ function showQuestion(isReview = false) {
         `
             : ""
         }
-        <div id="explanation-btn-slot"></div>
         ${getNavigationHTML()}
     `;
 
@@ -769,11 +845,40 @@ function showQuestion(isReview = false) {
     }
   }
 
-  activeSection.querySelector(".stats-bar").style.display = "block";
-  
-  // Render the explanation button into the slot for this question
-  renderExplanationButton();
-  
+  // Add explanation button to correct option if user has answered and explanation exists
+  if (userAnswer && q.explanation && !isMockTest && hasCorrectAnswer) {
+    const options = container.querySelectorAll(".option");
+    options.forEach((option) => {
+      const optionTextEl = option.querySelector('.option-text');
+      if (optionTextEl) {
+        const optionKey = optionTextEl.textContent.split(")")[0].trim();
+        if (optionKey === q.correct_answer) {
+          // Check if explanation button already exists
+          if (!option.querySelector('.inline-explanation-btn')) {
+            const explanationBtn = document.createElement('button');
+            explanationBtn.className = 'inline-explanation-btn';
+            explanationBtn.innerHTML = '<i class="fas fa-lightbulb"></i><span>Explanation</span>';
+            explanationBtn.title = 'View Explanation';
+            // Re-enable pointer events on the button (parent option may have pointer-events: none)
+            explanationBtn.style.pointerEvents = 'auto';
+            explanationBtn.onclick = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleExplanation();
+            };
+            option.appendChild(explanationBtn);
+          } else {
+            // If button already exists, ensure it's clickable
+            const existingBtn = option.querySelector('.inline-explanation-btn');
+            if (existingBtn) {
+              existingBtn.style.pointerEvents = 'auto';
+            }
+          }
+        }
+      }
+    });
+  }
+
   resetExplanationState();
 
   updateStats();
@@ -878,10 +983,39 @@ function selectOption(element, selected, correct) {
 
   updateStats();
 
-  // Show explanation button if explanation exists
+  // Add explanation button to correct option if explanation exists
   const currentMCQ = currentMCQs[currentIndex];
-  if (currentMCQ.explanation) {
-    showExplanationButton();
+  if (currentMCQ && currentMCQ.explanation && !isMockTest) {
+    // Find the correct option and add explanation button
+    options.forEach((option) => {
+      const optionTextEl = option.querySelector('.option-text');
+      if (optionTextEl) {
+        const optionKey = optionTextEl.textContent.split(")")[0].trim();
+        if (optionKey === correct) {
+          // Check if explanation button already exists
+          if (!option.querySelector('.inline-explanation-btn')) {
+            const explanationBtn = document.createElement('button');
+            explanationBtn.className = 'inline-explanation-btn';
+            explanationBtn.innerHTML = '<i class="fas fa-lightbulb"></i><span>Explanation</span>';
+            explanationBtn.title = 'View Explanation';
+            // Re-enable pointer events on the button (parent option has pointer-events: none)
+            explanationBtn.style.pointerEvents = 'auto';
+            explanationBtn.onclick = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleExplanation();
+            };
+            option.appendChild(explanationBtn);
+          } else {
+            // If button already exists, ensure it's clickable
+            const existingBtn = option.querySelector('.inline-explanation-btn');
+            if (existingBtn) {
+              existingBtn.style.pointerEvents = 'auto';
+            }
+          }
+        }
+      }
+    });
   }
 
   // Persist after user attempts a question
@@ -934,19 +1068,12 @@ function showFinalResults() {
   );
   const questionBox = container.querySelector("#question-box");
 
-  // Hide stats score when showing results (requested)
-  try {
-    const statsBar = container.querySelector('.stats-bar');
-    const scoreStat = container.querySelector('#score');
-    if (statsBar) statsBar.style.display = 'none';
-    if (scoreStat) scoreStat.style.display = 'none';
-  } catch {}
 
   if (isMockTest) {
     // Simple result card for Mock Test
     const percent = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0;
     const timer = getSavedTimer();
-    const totalMs = 20 * 60 * 1000;
+    const totalMs = 4 * 60 * 60 * 1000; // 4 hours
     const remainingMs = timer && Number.isFinite(timer.remainingMs) ? timer.remainingMs : totalMs;
     const takenMin = Math.max(0, Math.round((totalMs - remainingMs) / 60000));
 
@@ -1215,7 +1342,20 @@ function toggleReviewExplanation(index) {
 }
 
 function showAllMCQsReview() {
-  const container = document.getElementById("question-box");
+  const activeSection = document.querySelector(
+    ".content-section[style*='display: block']"
+  );
+  if (!activeSection) {
+    console.error("No active section found");
+    return;
+  }
+  
+  const container = activeSection.querySelector("#question-box");
+  if (!container) {
+    console.error("question-box not found");
+    return;
+  }
+  
   const reviewHTML = currentMCQs
     .map((q, index) => {
       const userAnswer = userAnswers[index];
@@ -1241,7 +1381,7 @@ function showAllMCQsReview() {
     .join("");
 
   container.innerHTML = `
-        <div class="main-content-container" style="padding: 20px;">
+        <div style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2 style="color: #2c3e50; margin: 0;">Review All Questions</h2>
                 <button class="nav-btn" onclick="showFinalResults()" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
@@ -1259,11 +1399,6 @@ function showAllMCQsReview() {
         </div>
     `;
 
-  // Hide stats bar during review
-  const statsBar = document.querySelector(".stats-bar");
-  if (statsBar) {
-    statsBar.style.display = "none";
-  }
 
   // Prevent scrolling beyond last review item (allow upward scrolling)
   const scrollHost = container.querySelector('div[style*="overflow-y: auto"]');
@@ -1531,24 +1666,17 @@ function formatExplanationContent(content) {
 
 // Utility functions
 function updateStats() {
-  const total = currentMCQs.length;
+  const total = isMockTest ? 200 : currentMCQs.length; // Always show 200 for mock test
   const activeSection = document.querySelector(
     ".content-section[style*='display: block']"
   );
   if (activeSection) {
-    const progressElement = activeSection.querySelector("#progress");
-    const scoreElement = activeSection.querySelector("#score");
+    const statsTitleElement = activeSection.querySelector("#stats-title");
     const timerElement = isMockTest ? activeSection.querySelector('#timer') : null;
-    if (progressElement)
-      progressElement.textContent = `Question ${currentIndex + 1} of ${total}`;
-    if (scoreElement) scoreElement.textContent = `Score: ${score}/${total}`;
-    if (timerElement && isMockTest) updateTimerUI(timerElement);
-    // Update progress bar fill
-    const barFill = activeSection.querySelector('.exam-progress-fill');
-    if (barFill && total > 0) {
-      const pct = ((currentIndex + 1) / total) * 100;
-      barFill.style.width = `${pct}%`;
+    if (statsTitleElement) {
+      statsTitleElement.textContent = `${currentIndex + 1}/${total}`;
     }
+    if (timerElement && isMockTest) updateTimerUI(timerElement);
   }
 }
 
@@ -1563,6 +1691,10 @@ function updateActiveButton(className, text) {
 
 function showErrorMessage(error) {
   const container = document.querySelector(".content-section[style*='block']");
+  if (!container) {
+    console.error("Error container not found:", error);
+    return;
+  }
   container.innerHTML = `
         <div style="text-align: center; padding: 20px;">
             <div class="warning" style="display: inline-block; margin-bottom: 20px;">
@@ -1687,8 +1819,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Inject toast container and global spinner
   injectUIHelpers();
   
-  // Create navigation bar
-  createNavigationBar();
+  // Create navigation bar (if function exists)
+  if (typeof createNavigationBar === 'function') {
+    createNavigationBar();
+  }
   
   // Set initial history state to prevent going to login page
   if (history.state === null) {
@@ -1739,7 +1873,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // keep paused until user explicitly starts/resumes (e.g., via startMockTest)
           updateTimerUI(document.querySelector('#timer'));
         } else {
-          startOrResumeMockTimer(20);
+          startOrResumeMockTimer(240); // 4 hours
         }
       }
     } catch (e) {

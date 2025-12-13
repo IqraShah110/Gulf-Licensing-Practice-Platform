@@ -1,6 +1,12 @@
 # app.py
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from db_handler import get_mcqs_by_subject, get_mcqs_by_exam_date, get_connection, ensure_all_tables_exist
+from db_handler import (
+    get_mcqs_by_subject,
+    get_mcqs_by_exam_date,
+    get_connection,
+    ensure_all_tables_exist,
+    get_mcqs_by_exam_table
+)
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
@@ -17,7 +23,7 @@ genai.configure(api_key=api_key)
 # Initialize Gemini model
 model = genai.GenerativeModel("models/gemini-1.5-pro-latest")
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')  # Required for session management
 
 # Initialize CSRF Protection
@@ -77,10 +83,21 @@ def generate_explanation(question, correct_option):
     except Exception as e:
         return f"Error generating explanation: {str(e)}"
 
-@app.route('/')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
 @login_required
-def index():
-    """Main entry point - shows the main index page"""
+def index(path):
+    """Main entry point - serves React app"""
+    try:
+        # Try to serve React build index.html
+        react_index = os.path.join('static', 'index.html')
+        if os.path.exists(react_index):
+            with open(react_index, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception as e:
+        print(f"Error serving React app: {e}")
+    
+    # Fallback to template if React build not available
     return render_template('index.html')
 
 @app.route('/prep')
@@ -102,61 +119,65 @@ def get_mcqs(subject):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def get_month_table_name(year, month):
+    """Get table name for a specific year and month"""
+    month_lower = month.lower()
+    year_suffix = str(year)[-2:]  # Get last 2 digits of year (e.g., 25 for 2025)
+    return f"{month_lower}{year_suffix}_mcqs"
+
+MONTH_TABLES_2025 = {
+    'january': 'january25_mcqs',
+    'february': 'february25_mcqs',
+    'march': 'march25_mcqs',
+    'april': 'april25_mcqs',
+    'may': 'may25_mcqs',
+    'june': 'june25_mcqs',
+    'july': 'july25_mcqs',
+    'august': 'august25_mcqs',
+    'september': 'september25_mcqs',
+    'october': 'october25_mcqs',
+    'november': 'november25_mcqs',
+    'december': 'december25_mcqs'
+}
+
+@app.route('/get_mcqs/exam/<int:year>/<month>')
+@login_required
+def get_exam_mcqs(year, month):
+    """Get MCQs for a specific exam year and month"""
+    try:
+        # For now, only 2025 has MCQs. This structure supports future years
+        if year == 2025:
+            table_name = MONTH_TABLES_2025.get(month.lower())
+        if not table_name:
+                return jsonify({'error': f"No MCQ table configured for {month} {year}."}), 404
+        elif year == 2023 or year == 2024:
+            # Return message for 2023 and 2024 (data not available yet)
+            return jsonify({'error': f"Data for {month} {year} will be updated soon"}), 404
+        else:
+            # For other years, use dynamic table name generation
+            # You can add specific tables for other years later
+            table_name = get_month_table_name(year, month)
+        
+        # Only try to get MCQs if we have a table name (for 2025)
+        if year == 2025:
+            mcqs = get_mcqs_by_exam_table(table_name)
+            if not mcqs or len(mcqs) == 0:
+                return jsonify({'error': f"This Month's MCQs for {year} will be updated soon"}), 404
+            return jsonify(mcqs)
+        else:
+            return jsonify({'error': f"Data for {month} {year} will be updated soon"}), 404
+    except Exception as e:
+        import traceback
+        print(f"Error in get_exam_mcqs: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+# Backward compatibility: Old route without year (defaults to 2025)
 @app.route('/get_mcqs/exam/<month>')
 @login_required
-def get_exam_mcqs(month):
-    """Get MCQs for a specific exam month"""
-    try:
-        if month.lower() == 'march':
-            try:
-                with get_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            SELECT 
-                                id, question_number, question_text, 
-                                option_a, option_b, option_c, option_d,
-                                correct_answer, subject, explanation
-                            FROM march25_mcqs
-                            ORDER BY 
-                                subject,
-                                CASE 
-                                    WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS INTEGER)
-                                    ELSE 999999
-                                END,
-                                question_number
-                        """)
-                        rows = cur.fetchall()
-                        
-                        # Convert rows to list of MCQs
-                        mcqs = []
-                        for row in rows:
-                            mcq = {
-                                'id': row[0],
-                                'question_number': row[1],
-                                'question_text': row[2],
-                                'options': {},
-                                'correct_answer': row[7],
-                                'subject': row[8],
-                                'explanation': row[9]
-                            }
-                            # Add non-null options
-                            if row[3]: mcq['options']['A'] = row[3]
-                            if row[4]: mcq['options']['B'] = row[4]
-                            if row[5]: mcq['options']['C'] = row[5]
-                            if row[6]: mcq['options']['D'] = row[6]
-                            
-                            mcqs.append(mcq)
-                        
-                        return jsonify(mcqs)
-            except Exception as e:
-                print(f"Database error: {e}")
-                return jsonify({'error': f"Error accessing MCQs: {str(e)}"}), 500
-        else:
-            return jsonify({
-                'error': f"No MCQs available for {month} 2025. Currently, only March MCQs are available."
-            }), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+def get_exam_mcqs_old(month):
+    """Get MCQs for a specific exam month (backward compatibility - defaults to 2025)"""
+    return get_exam_mcqs(2025, month)
 
 @app.route('/gemini_explanation', methods=['POST'])
 @login_required
@@ -171,44 +192,151 @@ def gemini_explanation():
 @app.route('/get_mcqs/mock_test')
 @login_required
 def get_mock_test_mcqs():
-    """Get 10 random MCQs from each major subject for mock test"""
+    """Get 200 random MCQs from all months for mock test:
+    Medicine: 70, Pediatrics: 50, Obstetrics & Gynecology: 40, General Surgery: 30
+    Total time: 4 hours"""
     try:
-        subjects = ['Medicine', 'Gynae', 'Surgery', 'Paeds']
+        from psycopg2 import sql
+        import random
+        
+        # Subject distribution
+        subject_limits = {
+            'Medicine': 70,
+            'Paeds': 50,
+            'Gynae': 40,
+            'Surgery': 30
+        }
+        
+        # All month tables for 2025 (check which ones exist)
+        month_tables = [
+            'january25_mcqs',
+            'february25_mcqs',
+            'march25_mcqs',
+            'april25_mcqs',
+            'may25_mcqs',
+            'june25_mcqs',
+            'july25_mcqs',
+            'august25_mcqs',
+            'september25_mcqs',
+            'october25_mcqs',
+            'november25_mcqs',
+            'december25_mcqs'
+        ]
+        
         all_mcqs = []
         with get_connection() as conn:
+            # Set autocommit to handle errors per query
+            conn.autocommit = False
             with conn.cursor() as cur:
-                for subject in subjects:
-                    cur.execute("""
-                        SELECT 
-                            id, question_number, question_text, 
-                            option_a, option_b, option_c, option_d,
-                            correct_answer, subject, explanation
-                        FROM march25_mcqs
-                        WHERE subject = %s
-                        ORDER BY RANDOM()
-                        LIMIT 10
-                    """, (subject,))
-                    rows = cur.fetchall()
-                    for row in rows:
-                        mcq = {
-                            'id': row[0],
-                            'question_number': row[1],
-                            'question_text': row[2],
-                            'options': {},
-                            'correct_answer': row[7],
-                            'subject': row[8],
-                            'explanation': row[9]
-                        }
-                        if row[3]: mcq['options']['A'] = row[3]
-                        if row[4]: mcq['options']['B'] = row[4]
-                        if row[5]: mcq['options']['C'] = row[5]
-                        if row[6]: mcq['options']['D'] = row[6]
-                        all_mcqs.append(mcq)
+                # First, check which tables exist
+                existing_tables = []
+                for table in month_tables:
+                    try:
+                        cur.execute("""
+                            SELECT EXISTS (
+                                SELECT FROM information_schema.tables 
+                                WHERE table_schema = 'public' 
+                                AND table_name = %s
+                            );
+                        """, (table,))
+                        if cur.fetchone()[0]:
+                            existing_tables.append(table)
+                    except Exception:
+                        conn.rollback()
+                        continue
+                
+                if not existing_tables:
+                    return jsonify({'error': 'No MCQ tables found'}), 404
+                
+                # Now query all existing tables at once using UNION ALL for each subject
+                for subject, limit in subject_limits.items():
+                    subject_mcqs = []
+                    
+                    # Use savepoint for each subject so errors don't abort the whole transaction
+                    savepoint_name = f"sp_{subject.lower()}"
+                    try:
+                        cur.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(savepoint_name)))
+                    except:
+                        pass
+                    
+                    try:
+                        # Build UNION ALL query for all existing tables
+                        # Each UNION part needs the subject parameter, so we'll use a list
+                        union_parts = []
+                        params = []
+                        for table in existing_tables:
+                            union_parts.append(sql.SQL("""
+                                SELECT 
+                                    id, question_number, question_text, 
+                                    option_a, option_b, option_c, option_d,
+                                    correct_answer, subject, explanation
+                                FROM {table}
+                                WHERE subject = %s
+                            """).format(table=sql.Identifier(table)))
+                            params.append(subject)
+                        
+                        if not union_parts:
+                            continue
+                        
+                        # Combine all queries with UNION ALL and randomize
+                        combined_query = sql.SQL(" UNION ALL ").join(union_parts)
+                        final_query = sql.SQL("""
+                            SELECT * FROM (
+                                {combined}
+                            ) AS all_mcqs
+                            ORDER BY RANDOM()
+                            LIMIT %s
+                        """).format(combined=combined_query)
+                        
+                        # Add limit parameter
+                        params.append(limit)
+                        
+                        cur.execute(final_query, params)
+                        rows = cur.fetchall()
+                        
+                        for row in rows:
+                            mcq = {
+                                'id': row[0],
+                                'question_number': row[1],
+                                'question_text': row[2],
+                                'options': {},
+                                'correct_answer': row[7],
+                                'subject': row[8],
+                                'explanation': row[9]
+                            }
+                            if row[3]: mcq['options']['A'] = row[3]
+                            if row[4]: mcq['options']['B'] = row[4]
+                            if row[5]: mcq['options']['C'] = row[5]
+                            if row[6]: mcq['options']['D'] = row[6]
+                            subject_mcqs.append(mcq)
+                        
+                        # If we got fewer than requested, that's okay
+                        all_mcqs.extend(subject_mcqs)
+                        
+                        # Release savepoint on success
+                        try:
+                            cur.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(savepoint_name)))
+                        except:
+                            pass
+                    except Exception as e:
+                        # Rollback to savepoint to continue with next subject
+                        try:
+                            cur.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(savepoint_name)))
+                        except:
+                            conn.rollback()
+                        print(f"⚠️ Error querying {subject}: {e}")
+                        # Continue with other subjects
+                        continue
+                
+                conn.commit()
+        
         # Shuffle all_mcqs so subjects are mixed
-        import random
         random.shuffle(all_mcqs)
         return jsonify(all_mcqs)
     except Exception as e:
+        import traceback
+        print(f"Error in get_mock_test_mcqs: {e}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
     
     

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>GULF LICENSING PRACTICE FOR GENERAL PRACTITIONER</title>
+    <title>GulfCertify - Practice MCQs for Gulf Licensing Exam</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,14 +20,14 @@
         <div class="hero-bg"></div>
         <div class="container text-center text-white position-relative">
           <div class="hero-content">
-            <h1 class="hero-title fw-bold mb-3 animate-fade-in">Gulf Licensing Exam for General Practitioner</h1>
+            <h1 class="hero-title fw-bold mb-3 animate-fade-in">GulfCertify</h1>
             <p class="hero-subtitle mb-0 animate-fade-in-delay">Practice exam-wise, subject-wise, or take a quick mock test. Clean UI, focused learning.</p>
             <div class="hero-stats mt-4 animate-fade-in-delay-2">
               <div class="row justify-content-center">
                 <div class="col-auto">
                   <div class="stat-item">
                     <span class="stat-emoji" aria-hidden="true">📘</span>
-                    <span class="stat-number">500+</span>
+                    <span class="stat-number">5000+</span>
                     <span class="stat-label">MCQs</span>
                   </div>
                 </div>
@@ -55,7 +55,7 @@
       <div class="container my-5" id="main-nav">
         <div class="text-center mb-4">
           <h2 class="section-title animate-fade-in">Choose Your Practice Mode</h2>
-          <p class="section-subtitle animate-fade-in-delay">Select the best way to prepare for your Gulf Licensing Exam</p>
+          <p class="section-subtitle animate-fade-in-delay">Select the best way to prepare for your Gulf Licensing Exam with GulfCertify</p>
           <div class="mt-2" style="font-weight:600;color:#1f2937;opacity:.9;">
             <em>“Small progress each day adds up to big results!”</em>
           </div>
@@ -69,7 +69,7 @@
                   <i class="fas fa-calendar-alt"></i>
                 </div>
                 <h5 class="card-title mb-0">Exam-wise MCQs</h5>
-                <p class="card-text text-muted mb-4">Practice MCQs from previous Gulf Licensing exams with detailed explanations.</p>
+                <p class="card-text text-muted mb-4">Practice MCQs from previous Gulf Licensing exams with detailed explanations on GulfCertify.</p>
                 <div class="mt-auto">
                   <button class="btn btn-primary btn-hover-effect">
                     <span>Start Practice</span>
@@ -124,7 +124,7 @@
     <!-- Exam-wise Selection Modal -->
     <div id="exam-wise-modal" class="selection-modal">
       <div class="modal-header">
-        <h2>Select Exam Month</h2>
+        <h2 id="exam-modal-title">Select Exam Year</h2>
         <button
           class="close-modal-btn"
           onclick="hideSelectionModal('exam-wise-modal')"
@@ -133,19 +133,67 @@
         </button>
       </div>
       <div class="modal-content">
-        <div class="month-grid">
-          {% for month in ['January', 'February', 'March', 'April', 'May',
-          'June', 'July', 'August', 'September', 'October', 'November',
-          'December'] %}
-          <button
-            class="month-btn {% if month == 'March' %}has-mcqs{% endif %}"
-            onclick="loadExamDate('{{ month }}')"
-          >
-            {{ month }} {% if month == 'March' %}
-            <span class="mcq-badge">Available</span>
-            {% endif %}
-          </button>
-          {% endfor %}
+        <!-- Year Selection with Dropdowns -->
+        <div id="year-selection" style="display: flex; flex-direction: column; gap: 15px;">
+          <!-- 2023 -->
+          <div class="year-dropdown-container">
+            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2023)">
+              <span>2023</span>
+              <i class="fas fa-chevron-down" id="chevron-2023"></i>
+            </button>
+            <div class="year-months-grid" id="months-2023" style="display: none;">
+              {% for month in ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September', 'October', 'November',
+              'December'] %}
+              <button
+                class="month-btn"
+                onclick="loadExamDateWithYear('{{ month }}', 2023)"
+              >
+                {{ month }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          
+          <!-- 2024 -->
+          <div class="year-dropdown-container">
+            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2024)">
+              <span>2024</span>
+              <i class="fas fa-chevron-down" id="chevron-2024"></i>
+            </button>
+            <div class="year-months-grid" id="months-2024" style="display: none;">
+              {% for month in ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September', 'October', 'November',
+              'December'] %}
+              <button
+                class="month-btn"
+                onclick="loadExamDateWithYear('{{ month }}', 2024)"
+              >
+                {{ month }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          
+          <!-- 2025 -->
+          <div class="year-dropdown-container">
+            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2025)">
+              <span>2025</span>
+              <i class="fas fa-chevron-down" id="chevron-2025"></i>
+            </button>
+            <div class="year-months-grid" id="months-2025" style="display: none;">
+              {% for month in ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September', 'October', 'November',
+              'December'] %}
+              <button
+                class="month-btn"
+                onclick="loadExamDateWithYear('{{ month }}', 2025)"
+              >
+                {{ month }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -191,11 +239,11 @@
     <div style="text-align:left;">
       <div style="margin-bottom:14px;color:#1f2937;display:grid;grid-template-columns: 180px 1fr;gap:8px 12px;align-items:center;">
         <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">📘</span><span>Title</span></div>
-        <div>Gulf Licensing Mock Test – GP</div>
+        <div>GulfCertify Mock Test – GP</div>
         <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">🧮</span><span>Total Questions</span></div>
-        <div>40</div>
+        <div>200</div>
         <div style="font-weight:600;display:flex;align-items:center;gap:8px;"><span aria-hidden="true">⏱️</span><span>Duration</span></div>
-        <div>20 Minutes</div>
+        <div>4 Hours</div>
       </div>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;">
       <div style="margin-top:16px;margin-bottom:8px;font-weight:700;color:#1565c0;display:flex;align-items:center;gap:8px;">
@@ -205,19 +253,19 @@
       <ul style="margin:0;padding-left:0;color:#374151;list-style:none;">
         <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
           <strong>Medicine</strong>
-          <span>10 Questions</span>
-        </li>
-        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
-          <strong>Surgery</strong>
-          <span>10 Questions</span>
+          <span>70 Questions</span>
         </li>
         <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
           <strong>Pediatrics</strong>
-          <span>10 Questions</span>
+          <span>50 Questions</span>
         </li>
         <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
-          <strong>Gynecology</strong>
-          <span>10 Questions</span>
+          <strong>Obstetrics & Gynecology</strong>
+          <span>40 Questions</span>
+        </li>
+        <li style="display:grid;grid-template-columns:180px auto;gap:0 12px;align-items:center;">
+          <strong>General Surgery</strong>
+          <span>30 Questions</span>
         </li>
       </ul>
     </div>
