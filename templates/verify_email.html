@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Verify Email - Gulf Licensing Prep</title>
+    <title>Verify Email - GulfCertify</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="auth-container">
-        <h2 class="main-title">GULF LICENSING Practice FOR GENERAL PRACTITIONER</h2>
+        <h2 class="main-title">GulfCertify</h2>
         <h3>Verify Your Email</h3>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,7 +32,7 @@
         </form>
         
         <p class="auth-link">
-            Didn't receive the code? <a href="{{ url_for('auth.resend_verification', email=email) }}">Resend Code</a>
+            Didn't receive the code? <a href="{{ url_for('auth.resend_verification') }}">Resend Code</a>
         </p>
     </div>
 </body>
