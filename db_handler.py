@@ -10,22 +10,28 @@ load_dotenv()
 def get_connection():
     """Get database connection using environment variables"""
     try:
-        # Print connection parameters for debugging (excluding password)
-        print("\nDEBUG - Attempting database connection with:")
-        print(f"Host: {os.getenv('DB_HOST', 'localhost')}")
-        print(f"Database: {os.getenv('DB_NAME', 'mcq_db')}")
-        print(f"User: {os.getenv('DB_USER', 'postgres')}")
-        print(f"Port: {os.getenv('DB_PORT', '5432')}")
-        print(f"SSL Mode: {os.getenv('DB_SSLMODE', 'require')}")
-        
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            dbname=os.getenv("DB_NAME", "mcq_db"),
-            user=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASSWORD", "yourpassword"),
-            port=os.getenv("DB_PORT", "5432"),
-            sslmode=os.getenv("DB_SSLMODE", "require")
-        )
+        db_url = os.getenv("DB_URL") or os.getenv("DATABASE_URL")
+
+        if db_url:
+            print("\nDEBUG - Attempting database connection using DB_URL")
+            conn = psycopg2.connect(db_url)
+        else:
+            # Print connection parameters for debugging (excluding password)
+            print("\nDEBUG - Attempting database connection with:")
+            print(f"Host: {os.getenv('DB_HOST', 'localhost')}")
+            print(f"Database: {os.getenv('DB_NAME', 'mcq_db')}")
+            print(f"User: {os.getenv('DB_USER', 'postgres')}")
+            print(f"Port: {os.getenv('DB_PORT', '5432')}")
+            print(f"SSL Mode: {os.getenv('DB_SSLMODE', 'require')}")
+            
+            conn = psycopg2.connect(
+                host=os.getenv("DB_HOST", "localhost"),
+                dbname=os.getenv("DB_NAME", "mcq_db"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", "yourpassword"),
+                port=os.getenv("DB_PORT", "5432"),
+                sslmode=os.getenv("DB_SSLMODE", "require")
+            )
         print("✅ Database connection successful")
         return conn
     except psycopg2.Error as e:
@@ -298,51 +304,79 @@ def validate_mcq_data(mcq):
     return True
 
 def get_mcqs_by_subject(subject):
-    """Retrieve MCQs for a specific subject"""
+    """Retrieve MCQs for a specific subject from ALL month tables (e.g., january25_mcqs ... december25_mcqs)."""
+    # List of month tables to search across; add/remove here as needed
+    month_tables = [
+        'january25_mcqs',
+        'february25_mcqs',
+        'march25_mcqs',
+        'april25_mcqs',
+        'may25_mcqs',
+        'june25_mcqs',
+        'july25_mcqs',
+        'august25_mcqs',
+        'september25_mcqs',
+        'october25_mcqs',
+        'november25_mcqs',
+        'december25_mcqs',
+    ]
+
     try:
+        all_rows = []
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 
-                        id,
-                        question_number, question_text, 
-                        option_a, option_b, option_c, option_d,
-                        correct_answer, source_file, appearance_count,
-                        exam_date, explanation
-                    FROM march25_mcqs 
-                    WHERE subject = %s
-                    ORDER BY 
-                        CASE 
-                            WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS INTEGER)
-                            ELSE 999999
-                        END,
-                        question_number
-                    """,
-                    (subject,)
-                )
-                rows = cur.fetchall()
-                
-                mcqs = []
-                for idx, row in enumerate(rows, 1):  # Start enumeration from 1
-                    # Only include non-null options
-                    options = {}
-                    if row[3]: options['A'] = row[3]
-                    if row[4]: options['B'] = row[4]
-                    if row[5]: options['C'] = row[5]
-                    if row[6]: options['D'] = row[6]
-                    
-                    mcqs.append({
-                        'id': row[0],
-                        'display_number': idx,  # Sequential number for display
-                        'question_text': row[2],
-                        'options': options,
-                        'correct_answer': row[7],
-                        'source_file': row[8],
-                        'exam_date': row[10].strftime('%B %Y') if row[10] else None,
-                        'explanation': row[11]  # Add explanation to the returned data
-                    })
-                return mcqs
+                for table in month_tables:
+                    try:
+                        query = sql.SQL("""
+                            SELECT 
+                                id,
+                                question_number,
+                                question_text, 
+                                option_a,
+                                option_b,
+                                option_c,
+                                option_d,
+                                correct_answer,
+                                subject,
+                                explanation
+                            FROM {table}
+                            WHERE subject = %s
+                            ORDER BY 
+                                CASE 
+                                    WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS BIGINT)
+                                    ELSE 999999
+                                END,
+                                question_number
+                        """).format(table=sql.Identifier(table))
+                        cur.execute(query, (subject,))
+                        rows = cur.fetchall()
+                        all_rows.extend(rows)
+                    except Exception as te:
+                        # Table might not exist yet or have different schema; skip but log
+                        print(f"⚠️ Skipping table {table} for subject {subject}: {te}")
+        
+        # Build unified MCQ list with sequential display_number across all months
+        mcqs = []
+        for idx, row in enumerate(all_rows, 1):
+            options = {}
+            if row[3]: options['A'] = row[3]
+            if row[4]: options['B'] = row[4]
+            if row[5]: options['C'] = row[5]
+            if row[6]: options['D'] = row[6]
+            
+            mcqs.append({
+                'id': row[0],
+                'display_number': idx,
+                'question_text': row[2],
+                'options': options,
+                'correct_answer': row[7],
+                # We don't have reliable per-table exam_date/source_file for all months,
+                # so keep them None for now to maintain API shape.
+                'source_file': None,
+                'exam_date': None,
+                'explanation': row[9]
+            })
+        return mcqs
     except Exception as e:
         print(f"❌ Error retrieving MCQs for subject {subject}: {e}")
         return []
@@ -364,7 +398,7 @@ def get_mcqs_by_exam_date(exam_date):
                     ORDER BY 
                         subject,
                         CASE 
-                            WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS INTEGER)
+                            WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS BIGINT)
                             ELSE 999999
                         END,
                         question_number
@@ -403,6 +437,57 @@ def get_mcqs_by_exam_date(exam_date):
                 return mcqs
     except Exception as e:
         print(f"❌ Error retrieving MCQs for exam date {exam_date}: {e}")
+        return []
+
+def get_mcqs_by_exam_table(table_name):
+    """Retrieve all MCQs for a given month table (e.g., march25_mcqs)"""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                query = sql.SQL("""
+                    SELECT 
+                        id,
+                        question_number,
+                        question_text,
+                        option_a,
+                        option_b,
+                        option_c,
+                        option_d,
+                        correct_answer,
+                        subject,
+                        explanation
+                    FROM {table}
+                    ORDER BY 
+                        subject,
+                        CASE 
+                            WHEN question_number ~ '^[0-9]+' THEN CAST(regexp_replace(question_number, '[^0-9].*$', '') AS BIGINT)
+                            ELSE 999999
+                        END,
+                        question_number
+                """).format(table=sql.Identifier(table_name))
+                cur.execute(query)
+                rows = cur.fetchall()
+                
+                mcqs = []
+                for row in rows:
+                    options = {}
+                    if row[3]: options['A'] = row[3]
+                    if row[4]: options['B'] = row[4]
+                    if row[5]: options['C'] = row[5]
+                    if row[6]: options['D'] = row[6]
+                    
+                    mcqs.append({
+                        'id': row[0],
+                        'question_number': row[1],
+                        'question_text': row[2],
+                        'options': options,
+                        'correct_answer': row[7],
+                        'subject': row[8],
+                        'explanation': row[9]
+                    })
+                return mcqs
+    except Exception as e:
+        print(f"❌ Error retrieving MCQs from table {table_name}: {e}")
         return []
 
 def get_mcq_statistics():
