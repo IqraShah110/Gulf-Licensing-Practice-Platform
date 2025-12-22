@@ -40,17 +40,11 @@ if not app.config['WTF_CSRF_SECRET_KEY']:
     raise ValueError("CSRF_SECRET_KEY environment variable is required for CSRF protection")
 
 # Initialize Rate Limiting
-# Use Redis if available, otherwise use memory (acceptable for single-worker deployments)
-redis_url = os.getenv('REDIS_URL')
-import warnings
-# Suppress Flask-Limiter warning about in-memory storage if Redis is not configured
-warnings.filterwarnings('ignore', message='.*in-memory storage.*', category=UserWarning)
-
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=redis_url if redis_url else None,  # Use Redis if available
+    storage_uri=os.getenv('REDIS_URL'),  # Optional: Use Redis for distributed rate limiting
     default_limits_per_method=True,
     headers_enabled=True
 )
