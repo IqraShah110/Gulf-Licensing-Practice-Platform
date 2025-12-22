@@ -14,13 +14,13 @@ def send_verification_email(email, verification_code):
     """Send verification email to user"""
     try:
         msg = Message(
-            'Verify Your Email - Gulf Licensing Prep',
+            'Verify Your Email - GulfCertify',
             sender=current_app.config['MAIL_DEFAULT_SENDER'],
             recipients=[email]
         )
         
         msg.body = f"""
-        Welcome to Gulf Licensing Prep!
+        Welcome to GulfCertify!
         
         Your verification code is: {verification_code}
         
@@ -28,17 +28,17 @@ def send_verification_email(email, verification_code):
         
         If you didn't request this verification, please ignore this email.
         
-        Best regards,
-        Gulf Licensing Prep Team
+        Best Regards,
+        GulfCertify
         """
         
         msg.html = f"""
-        <h2>Welcome to Gulf Licensing Prep!</h2>
+        <h2>Welcome to GulfCertify!</h2>
         <p>Your verification code is: <strong>{verification_code}</strong></p>
         <p>Please enter this code to verify your email address.</p>
         <p>If you didn't request this verification, please ignore this email.</p>
         <br>
-        <p>Best regards,<br>Gulf Licensing Prep Team</p>
+        <p>Best Regards,<br>GulfCertify</p>
         """
         
         mail.send(msg)

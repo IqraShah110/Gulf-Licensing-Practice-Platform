@@ -24,11 +24,16 @@ def get_connection():
             print(f"Port: {os.getenv('DB_PORT', '5432')}")
             print(f"SSL Mode: {os.getenv('DB_SSLMODE', 'require')}")
             
+            # Require DB_PASSWORD - no default fallback for security
+            db_password = os.getenv("DB_PASSWORD")
+            if not db_password:
+                raise ValueError("DB_PASSWORD environment variable is required")
+            
             conn = psycopg2.connect(
                 host=os.getenv("DB_HOST", "localhost"),
                 dbname=os.getenv("DB_NAME", "mcq_db"),
                 user=os.getenv("DB_USER", "postgres"),
-                password=os.getenv("DB_PASSWORD", "yourpassword"),
+                password=db_password,
                 port=os.getenv("DB_PORT", "5432"),
                 sslmode=os.getenv("DB_SSLMODE", "require")
             )
@@ -40,11 +45,15 @@ def get_connection():
         if isinstance(e, psycopg2.OperationalError) and "does not exist" in str(e):
             try:
                 # Connect to default postgres database
+                db_password = os.getenv("DB_PASSWORD")
+                if not db_password:
+                    raise ValueError("DB_PASSWORD environment variable is required")
+                
                 conn = psycopg2.connect(
                     host=os.getenv("DB_HOST", "localhost"),
                     dbname="postgres",
                     user=os.getenv("DB_USER", "postgres"),
-                    password=os.getenv("DB_PASSWORD", "yourpassword"),
+                    password=db_password,
                     port=os.getenv("DB_PORT", "5432")
                 )
                 conn.autocommit = True
@@ -304,7 +313,15 @@ def validate_mcq_data(mcq):
     return True
 
 def get_mcqs_by_subject(subject):
-    """Retrieve MCQs for a specific subject from ALL month tables (e.g., january25_mcqs ... december25_mcqs)."""
+    """Retrieve MCQs for a specific subject from ALL month tables (e.g., january25_mcqs ... december25_mcqs).
+    STRICTLY filters by subject - only returns MCQs matching the exact subject name."""
+    
+    # Validate subject parameter
+    valid_subjects = ['Surgery', 'Medicine', 'Gynae', 'Paeds']
+    if subject not in valid_subjects:
+        print(f"❌ Invalid subject '{subject}'. Must be one of: {valid_subjects}")
+        return []
+    
     # List of month tables to search across; add/remove here as needed
     month_tables = [
         'january25_mcqs',
@@ -327,6 +344,7 @@ def get_mcqs_by_subject(subject):
             with conn.cursor() as cur:
                 for table in month_tables:
                     try:
+                        # STRICT filtering: WHERE subject = %s ensures only exact matches
                         query = sql.SQL("""
                             SELECT 
                                 id,
@@ -350,14 +368,28 @@ def get_mcqs_by_subject(subject):
                         """).format(table=sql.Identifier(table))
                         cur.execute(query, (subject,))
                         rows = cur.fetchall()
-                        all_rows.extend(rows)
+                        
+                        # Verify each row's subject matches (double-check)
+                        for row in rows:
+                            row_subject = row[8]  # subject is at index 8
+                            if row_subject != subject:
+                                print(f"⚠️ WARNING: Found MCQ in {table} with subject '{row_subject}' when querying for '{subject}'. Skipping.")
+                                continue
+                            all_rows.append(row)
                     except Exception as te:
                         # Table might not exist yet or have different schema; skip but log
                         print(f"⚠️ Skipping table {table} for subject {subject}: {te}")
         
         # Build unified MCQ list with sequential display_number across all months
+        # Final verification: ensure all MCQs are for the requested subject
         mcqs = []
         for idx, row in enumerate(all_rows, 1):
+            # Final check: verify subject matches (row[8] is the subject column)
+            row_subject = row[8]
+            if row_subject != subject:
+                print(f"⚠️ ERROR: MCQ {row[0]} has subject '{row_subject}' but expected '{subject}'. Skipping.")
+                continue
+                
             options = {}
             if row[3]: options['A'] = row[3]
             if row[4]: options['B'] = row[4]
@@ -370,12 +402,15 @@ def get_mcqs_by_subject(subject):
                 'question_text': row[2],
                 'options': options,
                 'correct_answer': row[7],
+                'subject': row_subject,  # Include subject in response for verification
                 # We don't have reliable per-table exam_date/source_file for all months,
                 # so keep them None for now to maintain API shape.
                 'source_file': None,
                 'exam_date': None,
                 'explanation': row[9]
             })
+        
+        print(f"✅ Retrieved {len(mcqs)} MCQs for subject '{subject}' from {len(month_tables)} tables")
         return mcqs
     except Exception as e:
         print(f"❌ Error retrieving MCQs for subject {subject}: {e}")
