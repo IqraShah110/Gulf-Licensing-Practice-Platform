@@ -77,16 +77,6 @@ function Home({ onViewChange, showToast, setLoading }) {
 
       {/* Features Section */}
       <div className="container my-5" id="main-nav">
-        <div className="text-center mb-4">
-          <h2 className="section-title animate-fade-in">Choose Your Practice Mode</h2>
-          <p className="section-subtitle animate-fade-in-delay">
-            Select the best way to prepare for your Gulf Licensing Exam with GulfCertify
-          </p>
-          <div className="mt-2" style={{fontWeight: 600, color: '#1f2937', opacity: 0.9}}>
-            <em>"Small progress each day adds up to big results!"</em>
-          </div>
-        </div>
-        
         <div className="row g-4">
           <div className="col-12 col-md-4">
             <div 

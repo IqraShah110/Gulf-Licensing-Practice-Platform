@@ -3,8 +3,9 @@ import { useQuizState } from '../hooks/useQuizState';
 import { fetchMCQsBySubject } from '../utils/api';
 import MCQView from './MCQView';
 import ResultsView from './ResultsView';
+import SubjectSelector from './SubjectSelector';
 
-function SubjectWise({ subject: propSubject, onBackToHome, showToast, setLoading }) {
+function SubjectWise({ subject: propSubject, onBackToHome, showToast, setLoading, onViewChange }) {
   const [subject, setSubject] = useState(propSubject || null);
   const [showResults, setShowResults] = useState(false);
   const quizState = useQuizState();
@@ -31,7 +32,6 @@ function SubjectWise({ subject: propSubject, onBackToHome, showToast, setLoading
       quizState.setIsMockTest(false);
       showToast(`Loaded ${data.length} ${selectedSubject} MCQs`, 'success');
     } catch (error) {
-      console.error('Error loading subject MCQs:', error);
       showToast(error.message || 'Failed to load subject MCQs', 'error');
       onBackToHome();
     } finally {
@@ -82,15 +82,39 @@ function SubjectWise({ subject: propSubject, onBackToHome, showToast, setLoading
     );
   }
 
+  const handleSubjectChange = (newSubject) => {
+    if (newSubject !== subject) {
+      loadSubject(newSubject);
+    }
+  };
+
   const sectionTitle = (
     <>
-      <span className="highlight">{subject}</span>
-      <span className="highlight"> MCQs</span>
+      <span className="highlight subject-name">
+        {subject}
+      </span>
+      <span className="highlight mcqs-text"> MCQs</span>
+      {/* Icon-only selector placed after 'MCQs' */}
+      <SubjectSelector 
+        currentSubject={subject} 
+        onSubjectChange={handleSubjectChange}
+        showIcon={true}
+        showSubject={false}
+      />
     </>
   );
 
+  const switchButton = onViewChange ? (
+    <button 
+      className="nav-btn switch-btn"
+      onClick={() => onViewChange('exam-wise', { openExamSelector: true })}
+    >
+      Switch to Exam-wise MCQs
+    </button>
+  ) : null;
+
   return (
-    <div className="content-section" style={{ display: 'block' }}>
+    <div className="content-section active" style={{ display: 'block', opacity: 1 }}>
       <MCQView
         mcqs={quizState.currentMCQs}
         currentIndex={quizState.currentIndex}
@@ -100,6 +124,7 @@ function SubjectWise({ subject: propSubject, onBackToHome, showToast, setLoading
         onPrevious={handlePrevious}
         isMockTest={false}
         title={sectionTitle}
+        switchButton={switchButton}
       />
     </div>
   );

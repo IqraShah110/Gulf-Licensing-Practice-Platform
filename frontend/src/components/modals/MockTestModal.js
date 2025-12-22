@@ -34,7 +34,7 @@ function MockTestModal({ show, onClose, onStart }) {
               <div style={{fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <span aria-hidden="true">🧮</span><span>Total Questions</span>
               </div>
-              <div>200</div>
+              <div>210</div>
               <div style={{fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <span aria-hidden="true">⏱️</span><span>Duration</span>
               </div>
@@ -56,19 +56,19 @@ function MockTestModal({ show, onClose, onStart }) {
             <ul style={{margin: 0, paddingLeft: 0, color: '#374151', listStyle: 'none'}}>
               <li style={{display: 'grid', gridTemplateColumns: '180px auto', gap: '0 12px', alignItems: 'center'}}>
                 <strong>Medicine</strong>
-                <span>70 Questions</span>
-              </li>
-              <li style={{display: 'grid', gridTemplateColumns: '180px auto', gap: '0 12px', alignItems: 'center'}}>
-                <strong>Pediatrics</strong>
-                <span>50 Questions</span>
+                <span>63 MCQs</span>
               </li>
               <li style={{display: 'grid', gridTemplateColumns: '180px auto', gap: '0 12px', alignItems: 'center'}}>
                 <strong>Obstetrics & Gynecology</strong>
-                <span>40 Questions</span>
+                <span>53 MCQs</span>
               </li>
               <li style={{display: 'grid', gridTemplateColumns: '180px auto', gap: '0 12px', alignItems: 'center'}}>
-                <strong>General Surgery</strong>
-                <span>30 Questions</span>
+                <strong>Pediatrics</strong>
+                <span>52 MCQs</span>
+              </li>
+              <li style={{display: 'grid', gridTemplateColumns: '180px auto', gap: '0 12px', alignItems: 'center'}}>
+                <strong>Surgery</strong>
+                <span>42 MCQs</span>
               </li>
             </ul>
           </div>

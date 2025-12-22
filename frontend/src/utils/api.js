@@ -10,12 +10,25 @@ export async function fetchMCQsBySubject(subject) {
 }
 
 export async function fetchMCQsByExam(year, month) {
-  const response = await fetch(`${API_BASE}/get_mcqs/exam/${year}/${month}`);
+  // Ensure month is lowercase to match backend expectation
+  const monthLower = month.toLowerCase();
+  const url = `${API_BASE}/get_mcqs/exam/${year}/${monthLower}`;
+  
+  const response = await fetch(url);
+  
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch MCQs');
+    let errorMessage = 'Failed to fetch MCQs';
+    try {
+      const error = await response.json();
+      errorMessage = error.error || errorMessage;
+    } catch (e) {
+      errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
-  return response.json();
+  
+  const data = await response.json();
+  return data;
 }
 
 export async function fetchMockTestMCQs() {
@@ -41,8 +54,41 @@ export function formatExplanation(explanation) {
     return '<div style="padding: 20px; text-align: center; color: #666;"><p>No explanation is available for this question.</p></div>';
   }
 
+  // Remove A, B, C, D labels from explanation text (comprehensive and aggressive)
+  let cleanedExplanation = explanation
+    // First, remove from the very beginning of the entire text
+    .replace(/^[A-D]\)\s*/i, '')
+    .replace(/^[A-D]\.\s*/i, '')
+    .replace(/^[A-D]\s+/i, '')
+    // Remove from start of lines (multiline)
+    .replace(/^[A-D]\)\s*/gm, '') 
+    .replace(/^[A-D]\.\s*/gm, '')
+    .replace(/^[A-D]\s+/gm, '')
+    // Remove after ** markers (titles) - handle with and without spaces
+    .replace(/\*\*[A-D]\)\s*/gi, '**')
+    .replace(/\*\*\s*[A-D]\)\s*/gi, '**')
+    .replace(/\*\*[A-D]\.\s*/gi, '**')
+    .replace(/\*\*\s*[A-D]\.\s*/gi, '**')
+    .replace(/\*\*[A-D]\s+/gi, '**')
+    .replace(/\*\*\s*[A-D]\s+/gi, '**')
+    // Remove standalone in text (with spaces before and after)
+    .replace(/\s+[A-D]\)\s+/gi, ' ')
+    .replace(/\s+[A-D]\.\s+/gi, ' ')
+    .replace(/\s+[A-D]\s+/gi, ' ')
+    // Remove from HTML tags if any
+    .replace(/<h[1-6][^>]*>([A-D]\)\s*)/gi, '<h$1>')
+    .replace(/<h[1-6][^>]*>([A-D]\.\s*)/gi, '<h$1>')
+    .replace(/<strong>([A-D]\)\s*)/gi, '<strong>')
+    .replace(/<strong>([A-D]\.\s*)/gi, '<strong>')
+    // Remove from paragraph tags
+    .replace(/<p>([A-D]\)\s*)/gi, '<p>')
+    .replace(/<p>([A-D]\.\s*)/gi, '<p>')
+    // Remove from div tags
+    .replace(/<div[^>]*>([A-D]\)\s*)/gi, '<div$1>')
+    .replace(/<div[^>]*>([A-D]\.\s*)/gi, '<div$1>');
+
   try {
-    const sections = explanation.split(/\*\*[\d.]+\s+/);
+    const sections = cleanedExplanation.split(/\*\*[\d.]+\s+/);
     const result = sections
       .map((section) => {
         if (!section.trim()) return '';
@@ -55,20 +101,35 @@ export function formatExplanation(explanation) {
       .join('');
     
     if (!result || result.trim() === '') {
-      return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${explanation}</div>`;
+      return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${cleanedExplanation}</div>`;
     }
     
     return result;
   } catch (error) {
-    console.error('Error formatting explanation:', error);
-    return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${explanation}</div>`;
+    return `<div style="padding: 20px; overflow-wrap: break-word; line-height: 1.6;">${cleanedExplanation}</div>`;
   }
 }
 
 function formatExplanationSection(title, content) {
+  // Remove A, B, C, D labels from title (comprehensive and aggressive)
+  let cleanedTitle = title.trim()
+    // Remove from start - multiple passes to catch all variations
+    .replace(/^[A-D]\)\s*/i, '') // Remove "A) ", "B) ", "C) ", "D) " at start
+    .replace(/^[A-D]\.\s*/i, '') // Remove "A. ", "B. ", "C. ", "D. " at start
+    .replace(/^[A-D]\s+/i, '') // Remove "A ", "B ", "C ", "D " at start
+    .replace(/^\([A-D]\)\s*/i, '') // Remove "(A) ", "(B) ", etc. at start
+    .replace(/^\[[A-D]\]\s*/i, '') // Remove "[A] ", "[B] ", etc. at start
+    // Remove from end
+    .replace(/\s+[A-D]\)\s*$/i, '') // Remove " A)", " B)", etc. at end
+    .replace(/\s+[A-D]\.\s*$/i, '') // Remove " A.", " B.", etc. at end
+    .replace(/\s+[A-D]\s+$/i, '') // Remove " A ", " B ", etc. at end
+    // Additional cleanup - remove any remaining labels
+    .replace(/\b[A-D]\)\s*/gi, '') // Remove "A) " anywhere in title
+    .replace(/\b[A-D]\.\s*/gi, ''); // Remove "A. " anywhere in title
+  
   return `
     <div class="explanation-section">
-      <h3 class="section-header">${title.trim()}</h3>
+      <h3 class="section-header">${cleanedTitle}</h3>
       <div class="explanation-content">
         ${formatExplanationContent(content.trim())}
       </div>
@@ -77,7 +138,16 @@ function formatExplanationSection(title, content) {
 }
 
 function formatExplanationContent(content) {
-  return content
+  // First remove A, B, C, D labels from content
+  let cleanedContent = content
+    .replace(/^[A-D]\)\s*/gmi, '') // Remove from start of lines
+    .replace(/^[A-D]\.\s*/gmi, '')
+    .replace(/^[A-D]\s+/gmi, '')
+    .replace(/\s+[A-D]\)\s+/gi, ' ') // Remove standalone
+    .replace(/\s+[A-D]\.\s+/gi, ' ')
+    .replace(/\s+[A-D]\s+/gi, ' ');
+  
+  return cleanedContent
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     .split('\n')

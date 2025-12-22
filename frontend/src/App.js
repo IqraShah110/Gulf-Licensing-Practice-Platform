@@ -1,19 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './index.css';
 import Home from './components/Home';
 import ExamWise from './components/ExamWise';
 import SubjectWise from './components/SubjectWise';
 import MockTest from './components/MockTest';
-import BackToHomeButton from './components/BackToHomeButton';
 import ToastContainer from './components/ToastContainer';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function App() {
   const [currentView, setCurrentView] = useState('home');
   const [viewParams, setViewParams] = useState({});
-  const [showBackButton, setShowBackButton] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  // Initialize browser history on mount
+  useEffect(() => {
+    // Push initial state to history
+    window.history.pushState({ view: 'home', params: {} }, '', window.location.pathname);
+    
+    // Handle browser back/forward buttons
+    const handlePopState = (event) => {
+      if (event.state) {
+        setCurrentView(event.state.view || 'home');
+        setViewParams(event.state.params || {});
+      } else {
+        // If no state, go to home
+        setCurrentView('home');
+        setViewParams({});
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const showToast = (message, type = 'info', timeout = 3000) => {
     const id = Date.now();
@@ -25,14 +47,16 @@ function App() {
 
   const showHomePage = () => {
     setCurrentView('home');
-    setShowBackButton(false);
     setViewParams({});
+    // Update browser history without page reload
+    window.history.pushState({ view: 'home', params: {} }, '', window.location.pathname);
   };
 
   const handleViewChange = (view, params = {}) => {
     setCurrentView(view);
     setViewParams(params);
-    setShowBackButton(view !== 'home');
+    // Update browser history without page reload
+    window.history.pushState({ view, params }, '', window.location.pathname);
   };
 
   return (
@@ -52,9 +76,11 @@ function App() {
         <ExamWise 
           year={viewParams.year}
           month={viewParams.month}
+          openExamSelector={viewParams.openExamSelector}
           onBackToHome={showHomePage}
           showToast={showToast}
           setLoading={setLoading}
+          onViewChange={handleViewChange}
         />
       )}
       
@@ -64,6 +90,7 @@ function App() {
           onBackToHome={showHomePage}
           showToast={showToast}
           setLoading={setLoading}
+          onViewChange={handleViewChange}
         />
       )}
       
@@ -75,9 +102,6 @@ function App() {
         />
       )}
       
-      {showBackButton && (
-        <BackToHomeButton onClick={showHomePage} />
-      )}
     </div>
   );
 }

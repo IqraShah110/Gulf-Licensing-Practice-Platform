@@ -82,6 +82,24 @@ export function useQuizState() {
     saveQuizState('attempt');
   };
 
+  const setAllAnswers = (answers) => {
+    setUserAnswers(answers);
+    // Recalculate score and attempted
+    let newScore = 0;
+    let newAttempted = 0;
+    answers.forEach((answer, index) => {
+      if (answer !== null && currentMCQs[index]) {
+        newAttempted++;
+        if (answer === currentMCQs[index].correct_answer) {
+          newScore++;
+        }
+      }
+    });
+    setScore(newScore);
+    setAttempted(newAttempted);
+    saveQuizState('test-mode');
+  };
+
   return {
     currentIndex,
     setCurrentIndex,
@@ -97,7 +115,8 @@ export function useQuizState() {
     loadQuizState,
     clearQuizState,
     handleMCQData,
-    selectOption
+    selectOption,
+    setAllAnswers
   };
 }
 

@@ -11,13 +11,15 @@ function MCQView({
   onPrevious,
   isMockTest,
   title,
-  timerDisplay
+  timerDisplay,
+  switchButton
 }) {
   const [showExplanation, setShowExplanation] = useState(false);
-  const currentMCQ = mcqs[currentIndex];
+  
+  const currentMCQ = mcqs?.[currentIndex];
   
   if (!currentMCQ) {
-    return <div>No question available</div>;
+    return <div>No question available (Index: {currentIndex}, Total: {mcqs?.length || 0})</div>;
   }
 
   const questionText = currentMCQ.question_text || currentMCQ.question || '';
@@ -49,9 +51,7 @@ function MCQView({
     if (!hasCorrectAnswer) {
       className += ' disabled';
     }
-    if (isReview) {
-      className += ' disabled';
-    }
+    // Don't add disabled class when reviewing - keep options visible
     return className;
   };
 
@@ -59,45 +59,92 @@ function MCQView({
     <div className="main-content-container">
       <div className="header-container">
         <h2 className="section-title">
-          {title}:<span id="stats-title">{currentIndex + 1}/{isMockTest ? 200 : mcqs.length}</span>
+          {title}<span id="stats-title">:{currentIndex + 1}/{isMockTest ? 210 : mcqs.length}</span>
         </h2>
-        {timerDisplay && (
-          <span id="timer" style={{marginLeft: 'auto', fontWeight: 800, color: '#374151'}}>
-            {timerDisplay}
-          </span>
-        )}
+        <div className="nav-center" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {switchButton}
+          {timerDisplay && (
+            <span id="timer" style={{fontWeight: 800, color: '#374151'}}>
+              {timerDisplay}
+            </span>
+          )}
+        </div>
       </div>
       <div id="question-box" className="mcq-container" style={{margin: '0px'}}>
-        {isReview && userAnswer && (
-          <div className="review-mode">
-            Review Mode - Your previous answer: {userAnswer}
-          </div>
-        )}
         <div className="question-box clean-white">
           <h6 className="question-title larger-stem">
             <span>
-              <span className="question-label">Q:</span> {escapeHtml(questionText)}
+              <span className="question-number-label">Q{currentIndex + 1}:</span> {escapeHtml(questionText)}
             </span>
           </h6>
         </div>
         <div className="options-container even-options">
           {Object.entries(options).map(([key, value]) => {
             if (!value) return null;
+            const isCorrectAnswer = key === currentMCQ.correct_answer;
+            // Show explanation button on correct answer after user has answered
+            const showExplanationBtn = !isMockTest && userAnswer !== null && currentMCQ.explanation && isCorrectAnswer;
+            
             return (
               <div
                 key={key}
                 className={getOptionClass(key)}
                 onClick={() => handleOptionClick(key)}
-                style={{ cursor: (!hasCorrectAnswer || isReview) ? 'not-allowed' : 'pointer' }}
+                style={{ 
+                  cursor: (!hasCorrectAnswer || isReview) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  position: 'relative'
+                }}
               >
-                <input
-                  type="radio"
-                  name={`mcq-${currentIndex}`}
-                  checked={userAnswer === key}
-                  disabled={!hasCorrectAnswer || isReview}
-                  readOnly
-                />
-                <span className="option-text">{key}) {value}</span>
+                <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  <input
+                    type="radio"
+                    name={`mcq-${currentIndex}`}
+                    checked={userAnswer === key}
+                    disabled={!hasCorrectAnswer || isReview}
+                    readOnly
+                  />
+                  <span className="option-text">{value}</span>
+                </div>
+                {showExplanationBtn && (
+                  <button
+                    className="option-explanation-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowExplanation(true);
+                    }}
+                    style={{
+                      marginLeft: '12px',
+                      padding: '6px 12px',
+                      background: 'linear-gradient(135deg, #28a745, #20c997)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.85em',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(40, 167, 69, 0.3)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(40, 167, 69, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(40, 167, 69, 0.3)';
+                    }}
+                  >
+                    <i className="fas fa-lightbulb" style={{ fontSize: '0.9em' }}></i>
+                    <span>Explanation</span>
+                  </button>
+                )}
               </div>
             );
           })}
@@ -106,16 +153,6 @@ function MCQView({
           <div className="warning">
             Note: This question's correct answer is not available in the database.
             Please proceed to the next question.
-          </div>
-        )}
-        {!isMockTest && userAnswer && currentMCQ.explanation && (
-          <div className="explanation-btn-container">
-            <button 
-              className="show-explanation-btn"
-              onClick={() => setShowExplanation(true)}
-            >
-              Show Explanation
-            </button>
           </div>
         )}
         <div className="nav-buttons">
