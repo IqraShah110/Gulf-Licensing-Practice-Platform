@@ -122,9 +122,12 @@
     <!-- Modal overlay is created dynamically by script.js -->
 
     <!-- Exam-wise Selection Modal -->
-    <div id="exam-wise-modal" class="selection-modal">
-      <div class="modal-header">
-        <h2 id="exam-modal-title">Select Exam Year</h2>
+    <div id="exam-wise-modal" class="selection-modal exam-session-modal">
+      <div class="modal-header exam-session-header">
+        <div class="header-content">
+          <h2>Select Exam Session</h2>
+          <p class="header-subtitle">Choose year & month to view MCQs</p>
+        </div>
         <button
           class="close-modal-btn"
           onclick="hideSelectionModal('exam-wise-modal')"
@@ -132,69 +135,32 @@
           &times;
         </button>
       </div>
-      <div class="modal-content">
-        <!-- Year Selection with Dropdowns -->
-        <div id="year-selection" style="display: flex; flex-direction: column; gap: 15px;">
-          <!-- 2023 -->
-          <div class="year-dropdown-container">
-            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2023)">
-              <span>2023</span>
-              <i class="fas fa-chevron-down" id="chevron-2023"></i>
-            </button>
-            <div class="year-months-grid" id="months-2023" style="display: none;">
-              {% for month in ['January', 'February', 'March', 'April', 'May',
-              'June', 'July', 'August', 'September', 'October', 'November',
-              'December'] %}
-              <button
-                class="month-btn"
-                onclick="loadExamDateWithYear('{{ month }}', 2023)"
-              >
-                {{ month }}
-              </button>
-              {% endfor %}
-            </div>
-          </div>
-          
-          <!-- 2024 -->
-          <div class="year-dropdown-container">
-            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2024)">
-              <span>2024</span>
-              <i class="fas fa-chevron-down" id="chevron-2024"></i>
-            </button>
-            <div class="year-months-grid" id="months-2024" style="display: none;">
-              {% for month in ['January', 'February', 'March', 'April', 'May',
-              'June', 'July', 'August', 'September', 'October', 'November',
-              'December'] %}
-              <button
-                class="month-btn"
-                onclick="loadExamDateWithYear('{{ month }}', 2024)"
-              >
-                {{ month }}
-              </button>
-              {% endfor %}
-            </div>
-          </div>
-          
-          <!-- 2025 -->
-          <div class="year-dropdown-container">
-            <button class="year-dropdown-btn" onclick="toggleYearDropdown(2025)">
-              <span>2025</span>
-              <i class="fas fa-chevron-down" id="chevron-2025"></i>
-            </button>
-            <div class="year-months-grid" id="months-2025" style="display: none;">
-              {% for month in ['January', 'February', 'March', 'April', 'May',
-              'June', 'July', 'August', 'September', 'October', 'November',
-              'December'] %}
-              <button
-                class="month-btn"
-                onclick="loadExamDateWithYear('{{ month }}', 2025)"
-              >
-                {{ month }}
-              </button>
-              {% endfor %}
-            </div>
-          </div>
+      <div class="modal-content exam-session-content">
+        <!-- Year Navigation -->
+        <div class="exam-year-navigation-bar">
+          <button class="year-nav-arrow" onclick="navigateExamYear('prev')" id="prev-year-btn">
+            &lt;&lt;
+          </button>
+          <div class="current-year-display" id="current-year-display">2025</div>
+          <button class="year-nav-arrow" onclick="navigateExamYear('next')" id="next-year-btn">
+            &gt;&gt;
+          </button>
         </div>
+        
+        <!-- Month Grid with Question Counts -->
+        <div class="exam-month-grid-container" id="exam-month-grid">
+          <!-- Months will be dynamically populated -->
+        </div>
+        
+        <!-- Selection Summary -->
+        <div class="exam-selection-summary" id="exam-selection-summary">
+          Selected: <span id="selected-month-year">-</span>
+        </div>
+        
+        <!-- Continue Button -->
+        <button class="exam-continue-btn" id="exam-continue-btn" onclick="confirmExamSelection()" disabled>
+          Continue
+        </button>
       </div>
     </div>
 

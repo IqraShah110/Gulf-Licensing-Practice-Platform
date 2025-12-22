@@ -290,6 +290,298 @@ body {
   text-align: center;
 }
 
+/* Exam Session Modal Styles */
+.exam-session-modal {
+  max-width: 700px;
+}
+
+.exam-session-header {
+  padding: 24px 30px;
+}
+
+.exam-session-header .header-content {
+  flex: 1;
+}
+
+.exam-session-header h2 {
+  margin: 0 0 6px 0;
+  font-size: 1.6em;
+  font-weight: 700;
+}
+
+.exam-session-header .header-subtitle {
+  margin: 0;
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 400;
+}
+
+.exam-session-content {
+  padding: 4px 30px;
+  text-align: left;
+}
+
+/* Year Navigation Bar */
+.exam-year-navigation-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 10px;
+  padding: 16px 0;
+}
+
+.year-nav-arrow {
+  background: transparent;
+  border: 2px solid #e5e7eb;
+  color: #6b7280;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  min-width: 50px;
+}
+
+.year-nav-arrow:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.year-nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.current-year-display {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e40af;
+  min-width: 100px;
+  text-align: center;
+}
+
+/* Month Grid Container - Responsive */
+.exam-month-grid-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 columns on large screens */
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.exam-month-card {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.exam-month-card:hover:not(.no-exam) {
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  transform: translateY(-2px);
+}
+
+.exam-month-card.selected {
+  background: #dbeafe;
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.exam-month-card.no-exam {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+
+.exam-month-card .month-name {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.exam-month-card.selected .month-name {
+  color: #1e40af;
+}
+
+.exam-month-card.no-exam .month-name {
+  color: #9ca3af;
+}
+
+/* Selection Summary */
+.exam-selection-summary {
+  text-align: center;
+  padding: 16px 0;
+  margin-bottom: 20px;
+  font-size: 1.1em;
+  color: #374151;
+  font-weight: 500;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.exam-selection-summary span {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Continue Button */
+.exam-continue-btn {
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.exam-continue-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+  transform: translateY(-2px);
+}
+
+.exam-continue-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Responsive styles for Exam Session Modal */
+
+/* Medium screens (tablets) - 3 columns */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .exam-month-grid-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  .exam-month-card {
+    padding: 10px 8px;
+    min-height: 60px;
+  }
+  
+  .exam-month-card .month-name {
+    font-size: 0.9em;
+  }
+}
+
+/* Small screens (mobile) - 2 columns */
+@media (max-width: 768px) {
+  .exam-session-content {
+    padding: 20px 16px;
+  }
+  
+  .exam-year-navigation-bar {
+    gap: 12px;
+    padding: 12px 0;
+    margin-bottom: 20px;
+  }
+  
+  .year-nav-arrow {
+    font-size: 1rem;
+    padding: 6px 12px;
+    min-width: 40px;
+  }
+  
+  .current-year-display {
+    font-size: 1.5rem;
+    min-width: 80px;
+  }
+  
+  .exam-month-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .exam-month-card {
+    padding: 10px 8px;
+    min-height: 58px;
+  }
+  
+  .exam-month-card .month-name {
+    font-size: 0.88em;
+  }
+  
+  .exam-selection-summary {
+    font-size: 1em;
+    padding: 12px 0;
+    margin-bottom: 16px;
+  }
+  
+  .exam-continue-btn {
+    padding: 14px 20px;
+    font-size: 1em;
+  }
+}
+
+/* Extra small screens - 2 columns, smaller sizes */
+@media (max-width: 480px) {
+  .exam-session-content {
+    padding: 16px 12px;
+  }
+  
+  .exam-year-navigation-bar {
+    gap: 8px;
+    padding: 10px 0;
+  }
+  
+  .year-nav-arrow {
+    font-size: 0.9rem;
+    padding: 5px 10px;
+    min-width: 35px;
+  }
+  
+  .current-year-display {
+    font-size: 1.3rem;
+    min-width: 70px;
+  }
+  
+  .exam-month-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .exam-month-card {
+    padding: 8px 6px;
+    min-height: 55px;
+    border-radius: 8px;
+  }
+  
+  .exam-month-card .month-name {
+    font-size: 0.85em;
+  }
+  
+  .exam-selection-summary {
+    font-size: 0.95em;
+    padding: 10px 0;
+    margin-bottom: 14px;
+  }
+  
+  .exam-continue-btn {
+    padding: 12px 18px;
+    font-size: 0.95em;
+  }
+}
+
 /* Subject Buttons */
 #subject-buttons {
   display: flex;
@@ -1811,11 +2103,77 @@ span.incorrect {
 }
 
 .auth-form .form-group input {
+  width: 100% !important;
+  height: 44px !important;
+  border: 1.5px solid #dadce0 !important;
+  border-radius: 10px !important;
+  padding: 0 12px 0 9px !important;
+  font-size: 14px !important;
+  background: #FFFFFF !important;
+  color: #333333 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  transition: all 0.2s ease !important;
+}
+
+.auth-form .form-group input:focus {
+  outline: none !important;
+  border-color: #dadce0 !important;
+  box-shadow: none !important;
+}
+
+.auth-form .form-group input:focus-visible {
+  outline: none !important;
+  border-color: #dadce0 !important;
+  box-shadow: none !important;
+}
+
+/* Global override for all auth page inputs to remove blue outline */
+.auth-container input,
+.auth-container input:focus,
+.auth-container input:focus-visible,
+.auth-container input:active {
+  outline: none !important;
+  border-color: #dadce0 !important;
+  box-shadow: none !important;
+}
+
+.auth-container .form-group input,
+.auth-form .form-group input {
+  padding: 0 12px 0 9px !important;
+}
+
+.auth-container .form-group input[type="text"],
+.auth-container .form-group input[type="email"],
+.auth-container .form-group input[type="password"],
+.auth-form .form-group input[type="text"],
+.auth-form .form-group input[type="email"],
+.auth-form .form-group input[type="password"] {
+  padding: 0 12px 0 9px !important;
+}
+
+.auth-form .form-group input::placeholder {
+  color: #999;
+}
+
+/* Form validation error messages */
+.error-message {
+  color: #ef4444;
+  font-size: 0.85em;
+  margin-top: 6px;
+  display: block;
+}
+
+.error-message span {
+  display: block;
+  margin-top: 2px;
+}
+
+.auth-form .form-control {
   width: 100%;
   height: 44px;
   border: 1.5px solid #dadce0;
   border-radius: 10px;
-  padding: 8px 14px 8px 40px;
+  padding: 0 12px 0 9px;
   font-size: 14px;
   background: #FFFFFF;
   color: #333333;
@@ -1823,14 +2181,14 @@ span.incorrect {
   transition: all 0.2s ease;
 }
 
-.auth-form .form-group input:focus {
+.auth-form .form-control:focus {
   outline: none;
-  border-color: #007BFF;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  border-color: #dadce0;
+  box-shadow: none;
 }
 
-.auth-form .form-group input::placeholder {
-  color: #999;
+.auth-form .form-control.error {
+  border-color: #ef4444;
 }
 
 /* Password Toggle Button */
@@ -2080,9 +2438,9 @@ html {
 
 /* Header Container - Improved Spacing */
 .header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
   margin-bottom: 0;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 249, 250, 0.92));
   backdrop-filter: blur(10px);
@@ -2091,6 +2449,7 @@ html {
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  overflow-y: visible !important;
   flex-wrap: wrap;
   gap: 20px;
   padding: 20px 24px;
@@ -2100,6 +2459,19 @@ html {
   z-index: 50;
   box-shadow: 0 2px 10px rgba(0,0,0,0.04);
   flex-shrink: 0;
+}
+
+/* Ensure header container doesn't clip dropdowns on large screens */
+@media (min-width: 769px) {
+  .header-container {
+    overflow: visible !important;
+    z-index: 50;
+  }
+  
+  .section-title {
+    overflow: visible !important;
+    z-index: 10002 !important;
+  }
 }
 
 .section-title {
@@ -2113,11 +2485,664 @@ html {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   letter-spacing: -0.02em;
   line-height: 1.2;
+  position: relative;
+  z-index: 10002;
+  overflow: visible;
 }
 
 .section-title .highlight {
   color: #3498db;
   font-weight: 600;
+  -webkit-text-fill-color: #3498db !important;
+}
+
+/* Force subject name visibility - highest priority */
+.section-title .subject-selector-container,
+.section-title .subject-selector-container * {
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+}
+
+.section-title .subject-selector-container .highlight {
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: inline !important;
+}
+
+/* Subject Selector Dropdown Styles */
+.subject-selector-container {
+  position: relative !important;
+  display: inline-block !important;
+  z-index: 10001 !important;
+  cursor: default !important;
+}
+
+.subject-selector-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 2px 4px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: 4px !important;
+  color: #3498db !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: 600 !important;
+  outline: none !important;
+  border-radius: 4px !important;
+  transition: background-color 0.2s !important;
+  -webkit-text-fill-color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  vertical-align: middle !important;
+}
+
+.subject-selector-btn:hover {
+  background-color: rgba(52, 152, 219, 0.1) !important;
+  opacity: 1 !important;
+}
+
+.subject-selector-btn:hover {
+  opacity: 0.8;
+}
+
+.subject-selector-container .highlight {
+  display: inline !important;
+  pointer-events: none !important;
+  color: #3498db !important;
+  -webkit-text-fill-color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  cursor: default !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure subject name is visible even inside section-title */
+.section-title .subject-selector-container .highlight {
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: inline !important;
+  font-weight: 600 !important;
+}
+
+/* Additional override for any span inside subject-selector-container */
+.section-title .subject-selector-container span.highlight {
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: inline !important;
+}
+
+.subject-selector-btn .highlight {
+  display: none !important;
+}
+
+.subject-selector-btn span:last-child {
+  color: #3498db !important;
+  font-weight: bold !important;
+  margin-left: 6px !important;
+  -webkit-text-fill-color: #3498db !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+}
+
+.subject-dropdown {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  margin-top: 8px !important;
+  background-color: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  z-index: 99999 !important;
+  width: 185px !important;
+  overflow: hidden !important;
+  display: none;
+}
+
+.subject-selector-container {
+  position: relative !important;
+  display: inline-block !important;
+  z-index: 10001 !important;
+}
+
+.subject-dropdown-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: #fff !important;
+  color: #374151 !important;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.95em;
+  font-weight: 400;
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.subject-dropdown-item.active {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.subject-dropdown-item:hover {
+  background: #e3f2fd !important;
+  color: #1565c0 !important;
+  transform: translateX(4px) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.subject-dropdown-item.active:hover {
+  background: #e3f2fd !important;
+  color: #1565c0 !important;
+}
+
+.subject-name {
+  text-decoration: underline !important;
+}
+
+.mcqs-text {
+  text-decoration: underline !important;
+}
+
+.section-title .highlight.mcqs-text {
+  text-decoration: underline !important;
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+}
+
+.mcqs-text {
+  text-decoration: underline !important;
+}
+
+/* Exam-wise month/year selector (React + old frontend) */
+.exam-selector {
+  position: relative;
+  display: inline-block;
+  z-index: 10001;
+}
+
+.exam-selector-toggle {
+  background: rgba(255, 255, 255, 0.9);
+  /* border-radius: 999px; */
+  /* border: 1px solid #e5e7eb; */
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  /* box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08); */
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  border: none;
+}
+
+.exam-selector-toggle:hover {
+  background: #f9fafb;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.exam-title-text {
+  text-decoration: underline;
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+}
+
+.exam-selector-icon {
+  font-size: 0.75em;
+  line-height: 1;
+  color: #2563eb !important;
+  -webkit-text-fill-color: #2563eb !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: inline-block !important;
+  pointer-events: none;
+}
+
+.exam-dropdown-menu {
+  /* Render as a body-level floating panel, not inside the MCQ card */
+  position: fixed;
+  top: 51px; /* Aligned with toggle button */
+  left: 32px;
+  margin-top: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.16);
+  padding: 8px 0 4px 0;
+  z-index: 99999;
+  min-width: 260px;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.exam-year-group {
+  padding: 4px 0 6px 0;
+}
+
+.exam-year-label {
+  padding: 4px 16px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Year navigation bar */
+.exam-year-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.exam-year-nav-arrow {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.exam-year-nav-arrow:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.exam-year-nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.exam-year-display {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e40af;
+  background: #dbeafe;
+  padding: 6px 16px;
+  border-radius: 20px;
+  min-width: 80px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.exam-year-display.disabled-year {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.exam-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px 6px;
+  padding: 0 10px 6px 10px;
+}
+
+.exam-month-item {
+  border-radius: 999px;
+  border: none;
+  padding: 5px 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background-color: #f9fafb;
+  color: #4b5563;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.exam-month-item:hover {
+  background-color: #e0e7ff;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+.exam-month-item.active {
+  background-color: #dbeafe;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.exam-month-item.disabled-year {
+  opacity: 0.6;
+}
+
+/* Ensure exam dropdown text is visible inside gradient section title */
+.section-title .exam-dropdown-menu,
+.section-title .exam-dropdown-menu * {
+  -webkit-text-fill-color: #111827 !important;
+  color: #111827 !important;
+  background: transparent !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+}
+
+/* Animations for dropdown */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Bottom sheet styles for mobile */
+.exam-dropdown-bottom-sheet {
+  border-radius: 16px 16px 0 0 !important;
+  max-height: 85vh !important;
+  overflow-y: auto !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
+  padding-top: 12px !important;
+  padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+}
+
+.exam-dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99998;
+  backdrop-filter: blur(2px);
+}
+
+/* Handle bar for bottom sheet */
+.exam-dropdown-bottom-sheet::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 4px;
+  background: #d1d5db;
+  border-radius: 2px;
+  margin: 0 auto 12px auto;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  /* Mobile: Bottom sheet */
+  .exam-dropdown-menu {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    min-width: auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+  
+  .exam-dropdown-menu * {
+    pointer-events: auto !important;
+  }
+
+  .exam-year-group {
+    padding: 6px 0 8px 0;
+  }
+
+  .exam-year-label {
+    padding: 6px 20px;
+    font-size: 0.75rem;
+  }
+  
+  .exam-year-navigation {
+    padding: 14px 12px;
+    gap: 10px;
+  }
+  
+  .exam-year-nav-arrow {
+    font-size: 1.1rem;
+    min-width: 36px;
+    height: 36px;
+  }
+  
+  .exam-year-display {
+    font-size: 0.95rem;
+    padding: 8px 14px;
+    min-width: 70px;
+  }
+
+  .exam-month-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px 8px !important;
+    padding: 0 16px 12px 16px !important;
+  }
+
+  .exam-month-item {
+    padding: 10px 8px !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: rgba(52, 152, 219, 0.2) !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .exam-selector-toggle {
+    padding: 8px 12px !important;
+    
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Tablet: Adjusted floating dropdown */
+  .exam-dropdown-menu {
+    top: 50px !important;
+    min-width: 280px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+
+  .exam-month-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px 7px;
+  }
+
+  .exam-month-item {
+    padding: 6px 7px;
+    font-size: 0.88rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop: Full floating dropdown */
+  .exam-dropdown-menu {
+    top: 90px;
+    left: 32px;
+    min-width: 260px;
+    max-width: 320px;
+  }
+
+  .exam-month-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .exam-dropdown-menu {
+    max-height: 80vh !important;
+  }
+
+  .exam-month-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px 6px !important;
+    padding: 0 12px 10px 12px !important;
+  }
+
+  .exam-month-item {
+    padding: 9px 6px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .exam-year-label {
+    padding: 5px 16px;
+    font-size: 0.7rem;
+  }
+}
+
+.section-title .highlight.mcqs-text {
+  text-decoration: underline !important;
+  -webkit-text-fill-color: #3498db !important;
+  color: #3498db !important;
+}
+
+/* Responsive styles for subject dropdown */
+@media (max-width: 768px) {
+  .subject-selector-container {
+    z-index: 10001 !important;
+    position: relative !important;
+  }
+  
+  .subject-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: auto !important;
+    right: 0 !important;
+    margin-top: 8px !important;
+    z-index: 99999 !important;
+    width: 170px !important;
+    max-width: calc(100vw - 40px) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+    display: none;
+  }
+  
+  .subject-dropdown-item {
+    padding: 14px 16px !important;
+    font-size: 0.9em !important;
+  }
+  
+  .subject-selector-btn {
+    font-size: 0.95em !important;
+    padding: 3px 6px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .subject-dropdown {
+    width: 170px !important;
+    max-width: calc(100vw - 30px) !important;
+    margin-top: 6px !important;
+    display: none;
+    left: auto !important;
+    right: 0 !important;
+  }
+  
+  .subject-dropdown-item {
+    padding: 12px 14px !important;
+    font-size: 0.85em !important;
+  }
+  
+  .subject-selector-btn {
+    font-size: 0.9em !important;
+    padding: 2px 4px !important;
+  }
+  
+  .subject-selector-btn span:last-child {
+    font-size: 0.65em !important;
+    margin-left: 4px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .subject-selector-container {
+    z-index: 10001 !important;
+    position: relative !important;
+  }
+  
+  .subject-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: auto !important;
+    right: 0 !important;
+    margin-top: 8px !important;
+    z-index: 99999 !important;
+    width: 185px !important;
+    background-color: #fff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    overflow: hidden !important;
+    display: none;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .subject-dropdown-item {
+    padding: 14px 18px !important;
+    font-size: 1em !important;
+  }
 }
 
 
@@ -2239,8 +3264,9 @@ html {
   }
   
   .header-container {
-    flex-direction: column;
-    align-items: flex-start;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
     gap: 15px;
     padding: 15px 20px;
     position: sticky;
@@ -2704,6 +3730,7 @@ html {
   display: flex !important;
   flex-direction: column !important;
   height: auto !important;
+  position: relative !important;
 }
 
 .mcq-container {
@@ -2713,6 +3740,7 @@ html {
   flex-direction: column !important;
   min-height: auto !important;
   height: auto !important;
+  z-index: 1 !important;
 }
 
 .question-box {
@@ -2721,6 +3749,14 @@ html {
   min-height: auto !important;
   max-height: none !important;
   height: auto !important;
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+.question-box.clean-white {
+  z-index: 1 !important;
+  overflow: visible !important;
+  position: relative !important;
 }
 
 /* Remove scrollbar styling since we want natural growth */
@@ -2799,8 +3835,11 @@ html {
   .header-container {
     padding: 12px 16px !important;
     gap: 10px !important;
-    flex-direction: column;
-    align-items: flex-start;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-direction: row !important; /* Keep button in header */
+    flex-wrap: nowrap !important; /* Prevent wrapping */
   }
 
   .section-title {
@@ -2808,16 +3847,20 @@ html {
     line-height: 1.3;
     word-break: break-word;
   }
-
+  
+  /* Keep nav-center in header (button stays at top) */
   .nav-center {
-    width: 100%;
-    margin-top: 8px;
+    width: auto !important;
+    margin-top: 0 !important;
+    order: 0 !important;
+    flex-shrink: 0 !important;
   }
-
+  
   .switch-btn {
-    width: 100%;
-    font-size: 0.85em;
-    padding: 10px 16px;
+    width: auto !important;
+    font-size: 0.9em !important;
+    padding: 8px 14px !important;
+    white-space: nowrap !important;
   }
 
   /* Question box mobile */
@@ -2921,7 +3964,31 @@ html {
   .modal-content {
     padding: 20px 16px;
   }
-
+  
+  /* Exam Session Modal Mobile */
+  .exam-session-content {
+    padding: 20px 16px;
+  }
+  
+  .exam-year-navigation-bar {
+    gap: 12px;
+    padding: 12px 0;
+    margin-bottom: 20px;
+  }
+  
+  .year-nav-arrow {
+    font-size: 1rem;
+    padding: 6px 12px;
+    min-width: 40px;
+  }
+  
+  .current-year-display {
+    font-size: 1.5rem;
+    min-width: 80px;
+  }
+  
+  /* Exam month grid styles are defined in the main responsive section above */
+  
   /* Month grid mobile */
   .month-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -3381,8 +4448,9 @@ html {
   }
 
   .auth-form .form-group input {
-    height: 42px;
-    font-size: 16px; /* Prevents zoom on iOS */
+    height: 42px !important;
+    padding: 0 12px 0 9px !important;
+    font-size: 16px !important; /* Prevents zoom on iOS */
   }
 
   .auth-button {
@@ -3422,8 +4490,8 @@ html {
   }
 
   .auth-form .form-group input {
-    height: 44px;
-    padding: 8px 12px 8px 38px;
+    height: 44px !important;
+    padding: 0 12px 0 9px !important;
   }
 
   .input-icon {
@@ -3448,6 +4516,26 @@ html {
 
   .google-btn {
     height: 44px;
+  }
+}
+
+/* Switch button moves below header at < 468px */
+@media (max-width: 467px) {
+  .header-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .nav-center {
+    width: 100%;
+    margin-top: 8px;
+    order: 2;
+  }
+  
+  .switch-btn {
+    width: 100%;
+    font-size: 0.85em;
+    padding: 10px 16px;
   }
 }
 

@@ -18,14 +18,19 @@
         {% endwith %}
         
         <form method="POST" action="{{ url_for('auth.verify_email') }}" class="auth-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ form.hidden_tag() }}
             <input type="hidden" name="email" value="{{ email }}">
             
             <div class="form-group">
                 <label for="verification_code">Enter Verification Code:</label>
-                <input type="text" id="verification_code" name="verification_code" 
-                       pattern="[0-9]{6}" maxlength="6" required
-                       placeholder="Enter 6-digit code">
+                {{ form.verification_code(id="verification_code", maxlength="6", placeholder="Enter 6-digit code", class="form-control") }}
+                {% if form.verification_code.errors %}
+                    <div class="error-message">
+                        {% for error in form.verification_code.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
             
             <button type="submit" class="auth-button">Verify Email</button>
