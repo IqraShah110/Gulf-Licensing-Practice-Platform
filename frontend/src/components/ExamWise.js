@@ -470,8 +470,10 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
           <button 
             className="btn btn-primary mt-3"
             onClick={() => {
+              // Open the selector immediately (works for both mobile sheet and desktop dropdown)
               setShowModal(true);
-              setIsDropdownOpen(false);
+              openDropdown();
+              setIsDropdownOpen(true);
             }}
           >
             Select Different Month
