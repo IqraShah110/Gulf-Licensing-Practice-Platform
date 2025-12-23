@@ -454,18 +454,30 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
     );
   }
 
-  // If we have year/month but no MCQs, show error message
+  // If we have year/month but no MCQs, show error message + reopen selector
   if (quizState.currentMCQs.length === 0) {
     return (
-      <div className="container my-5">
-        <p>No MCQs found for {month} {year}. Please try selecting a different month.</p>
-        <button 
-          className="btn btn-primary mt-3"
-          onClick={() => setIsDropdownOpen(true)}
-        >
-          Select Different Month
-        </button>
-      </div>
+      <>
+        <ExamWiseModal
+          show={showModal}
+          onClose={handleModalClose}
+          onSelect={handleModalSelect}
+          initialYear={year || 2025}
+          initialMonth={month || 'January'}
+        />
+        <div className="container my-5">
+          <p>MCQs for {month} {year} will be updated soon. Please try another month.</p>
+          <button 
+            className="btn btn-primary mt-3"
+            onClick={() => {
+              setShowModal(true);
+              setIsDropdownOpen(false);
+            }}
+          >
+            Select Different Month
+          </button>
+        </div>
+      </>
     );
   }
 
@@ -477,18 +489,18 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
         onSelect={handleSubjectSelect}
       />
       <div className="content-section active" style={{ display: 'block', opacity: 1 }}>
-        <MCQView
-          mcqs={quizState.currentMCQs}
-          currentIndex={quizState.currentIndex}
-          userAnswers={quizState.userAnswers}
-          onSelectOption={handleSelectOption}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          isMockTest={false}
-          title={examTitle}
+      <MCQView
+        mcqs={quizState.currentMCQs}
+        currentIndex={quizState.currentIndex}
+        userAnswers={quizState.userAnswers}
+        onSelectOption={handleSelectOption}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        isMockTest={false}
+        title={examTitle}
           switchButton={switchButton}
-        />
-      </div>
+      />
+    </div>
     </>
   );
 }
