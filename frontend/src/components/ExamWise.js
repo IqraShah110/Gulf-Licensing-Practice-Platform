@@ -13,6 +13,7 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [isMobile, setIsMobile] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -127,6 +128,7 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
       // Set year and month state immediately so UI updates
       setYear(selectedYear);
       setMonth(selectedMonth);
+      setErrorMessage('');
       
       // API function will handle month lowercase conversion
       const data = await fetchMCQsByExam(selectedYear, selectedMonth);
@@ -141,8 +143,12 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
       showToast(`Loaded ${data.length} MCQs for ${selectedMonth} ${selectedYear}`, 'success');
     } catch (error) {
       showToast(error.message || 'Failed to load MCQs', 'error');
-      // Keep year and month set so user can see what they selected
-      // User can try selecting a different month
+      // Reset selection so the modal stays on the same screen and show inline message
+      quizState.resetState();
+      setYear(null);
+      setMonth(null);
+      setShowModal(true);
+      setErrorMessage(error.message || `MCQs for ${selectedMonth} ${selectedYear} will be updated soon`);
     } finally {
       setLoadingState(false);
       setLoading(false);
@@ -433,53 +439,12 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   // If no year/month selected yet, show modal or message
   if (!year || !month) {
     return (
-      <>
-        <ExamWiseModal
-          show={showModal}
-          onClose={handleModalClose}
-          onSelect={handleModalSelect}
-        />
-        {!showModal && (
-          <div className="container my-5">
-            <p>Please select a month and year to view MCQs.</p>
-            <button 
-              className="btn btn-primary mt-3"
-              onClick={() => setShowModal(true)}
-            >
-              Select Exam Session
-            </button>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  // If we have year/month but no MCQs, show error message + reopen selector
-  if (quizState.currentMCQs.length === 0) {
-    return (
-      <>
-        <ExamWiseModal
-          show={showModal}
-          onClose={handleModalClose}
-          onSelect={handleModalSelect}
-          initialYear={year || 2025}
-          initialMonth={month || 'January'}
-        />
-        <div className="container my-5">
-          <p>MCQs for {month} {year} will be updated soon. Please try another month.</p>
-          <button 
-            className="btn btn-primary mt-3"
-            onClick={() => {
-              // Open the selector immediately (works for both mobile sheet and desktop dropdown)
-              setShowModal(true);
-              openDropdown();
-              setIsDropdownOpen(true);
-            }}
-          >
-            Select Different Month
-          </button>
-        </div>
-      </>
+      <ExamWiseModal
+        show={true}
+        onClose={handleModalClose}
+        onSelect={handleModalSelect}
+        errorMessage={errorMessage}
+      />
     );
   }
 
