@@ -4429,9 +4429,11 @@ html {
 /* Login Page Mobile Responsive */
 @media (max-width: 768px) {
   .auth-container {
-    max-width: 90%;
-    padding: 28px 24px;
-    margin: 15px auto;
+    /* Make the card feel larger on tablets / small laptops */
+    max-width: 96%;
+    width: 100%;
+    padding: 28px 20px;
+    margin: 20px auto;
     border-radius: 12px;
   }
 
@@ -4466,10 +4468,12 @@ html {
 
 @media (max-width: 480px) {
   .auth-container {
-    max-width: 95%;
-    padding: 24px 20px;
-    margin: 10px auto;
-    border-radius: 10px;
+    /* Nearly full‑width card on phones */
+    max-width: 100%;
+    width: 100%;
+    padding: 24px 16px;
+    margin: 0 auto 16px auto;
+    border-radius: 0;
   }
 
   .login-brand-title {
