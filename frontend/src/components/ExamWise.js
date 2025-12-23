@@ -493,6 +493,22 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
     );
   }
 
+  // If we have a selection but no MCQs loaded (e.g., no data for that month),
+  // keep the modal open with the inline error instead of showing an empty MCQ view.
+  if (quizState.currentMCQs.length === 0) {
+    return (
+      <ExamWiseModal
+        show={true}
+        onClose={handleModalClose}
+        onSelect={handleModalSelect}
+        errorMessage={
+          errorMessage || `MCQs for ${month} ${year} will be updated soon`
+        }
+        isLoading={isLoadingExam}
+      />
+    );
+  }
+
   return (
     <>
       <SubjectWiseModal
