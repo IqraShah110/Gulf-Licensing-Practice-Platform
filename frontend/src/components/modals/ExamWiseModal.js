@@ -22,7 +22,7 @@ const monthAbbreviations = {
   'December': 'Dec'
 };
 
-function ExamWiseModal({ show, onClose, onSelect }) {
+function ExamWiseModal({ show, onClose, onSelect, errorMessage }) {
   const [currentYear, setCurrentYear] = useState(2025);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
@@ -102,6 +102,11 @@ function ExamWiseModal({ show, onClose, onSelect }) {
           <div className="modal-drag-handle" onClick={onClose}></div>
           
           <div className="exam-session-content-bottom">
+            {errorMessage && (
+              <div className="mobile-inline-alert">
+                {errorMessage}
+              </div>
+            )}
             {/* Year Navigation */}
             <div className="exam-year-navigation-bar">
               <button 
@@ -157,6 +162,11 @@ function ExamWiseModal({ show, onClose, onSelect }) {
           <div className="header-content">
             <h2>Select Exam Session</h2>
             <p className="header-subtitle">Choose year & month to view MCQs</p>
+            {errorMessage && (
+              <div className="desktop-inline-alert">
+                {errorMessage}
+              </div>
+            )}
           </div>
           <button className="close-modal-btn" onClick={onClose}>
             &times;

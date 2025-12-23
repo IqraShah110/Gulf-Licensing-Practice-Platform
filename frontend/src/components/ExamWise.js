@@ -141,6 +141,8 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
       quizState.setIsMockTest(false);
       
       showToast(`Loaded ${data.length} MCQs for ${selectedMonth} ${selectedYear}`, 'success');
+      // Close modal after successful load
+      setShowModal(false);
     } catch (error) {
       showToast(error.message || 'Failed to load MCQs', 'error');
       // Reset selection so the modal stays on the same screen and show inline message
@@ -391,7 +393,7 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   }, [openExamSelector, year, month]);
 
   const handleModalSelect = ({ year: selectedYear, month: selectedMonth }) => {
-    setShowModal(false);
+    // Keep modal open; loadExamDate will close on success or keep open on error
     loadExamDate(selectedYear, selectedMonth);
   };
 
