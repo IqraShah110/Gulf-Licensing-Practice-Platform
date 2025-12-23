@@ -1,4 +1,4 @@
-const API_BASE = '';
+const API_BASE = process.env.REACT_APP_API_BASE || '';
 
 export async function fetchMCQsBySubject(subject) {
   const response = await fetch(`${API_BASE}/get_mcqs/${subject}`);
@@ -9,12 +9,12 @@ export async function fetchMCQsBySubject(subject) {
   return response.json();
 }
 
-export async function fetchMCQsByExam(year, month) {
+export async function fetchMCQsByExam(year, month, options = {}) {
   // Ensure month is lowercase to match backend expectation
   const monthLower = month.toLowerCase();
   const url = `${API_BASE}/get_mcqs/exam/${year}/${monthLower}`;
   
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: options.signal });
   
   if (!response.ok) {
     let errorMessage = 'Failed to fetch MCQs';

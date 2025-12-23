@@ -22,7 +22,7 @@ const monthAbbreviations = {
   'December': 'Dec'
 };
 
-function ExamWiseModal({ show, onClose, onSelect, errorMessage }) {
+function ExamWiseModal({ show, onClose, onSelect, errorMessage, isLoading }) {
   const [currentYear, setCurrentYear] = useState(2025);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
@@ -135,8 +135,8 @@ function ExamWiseModal({ show, onClose, onSelect, errorMessage }) {
                   <button
                     key={month}
                     className={`exam-month-card ${isNoExam ? 'no-exam' : ''}`}
-                    onClick={() => handleMonthSelect(month)}
-                    disabled={isNoExam}
+                  onClick={() => handleMonthSelect(month)}
+                    disabled={isNoExam || isLoading}
                   >
                     <div className="month-name">{monthAbbreviations[month]}</div>
                   </button>
@@ -203,7 +203,7 @@ function ExamWiseModal({ show, onClose, onSelect, errorMessage }) {
                   key={month}
                   className={`exam-month-card-desktop ${isSelected ? 'selected' : ''} ${isNoExam ? 'no-exam' : ''}`}
                   onClick={() => handleMonthSelect(month)}
-                  disabled={isNoExam}
+                  disabled={isNoExam || isLoading}
                 >
                   <div className="month-name-desktop">{month}</div>
                 </button>
@@ -212,8 +212,13 @@ function ExamWiseModal({ show, onClose, onSelect, errorMessage }) {
           </div>
           
           {/* Selection Summary */}
-          <div className="exam-selection-summary">
+            <div className="exam-selection-summary">
             Selected: <span>{selectedMonth && selectedYear ? `${selectedMonth} ${selectedYear}` : '-'}</span>
+            {errorMessage && (
+              <div className="desktop-inline-alert" style={{ marginTop: '8px' }}>
+                {errorMessage}
+              </div>
+            )}
           </div>
           
           {/* Continue Button */}

@@ -13,7 +13,11 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [isLoadingExam, setIsLoadingExam] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const abortControllerRef = useRef(null);
+  const lastErrorKeyRef = useRef(null);
+  const lastFailedSelectionRef = useRef(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [isMobile, setIsMobile] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -52,8 +56,12 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
 
   useEffect(() => {
     if (propYear && propMonth) {
-      // If props changed or we don't have data yet, load
-      if (propYear !== year || propMonth !== month || quizState.currentMCQs.length === 0) {
+      const key = `${propYear}-${propMonth}`;
+      // If props changed and we haven't marked this selection as failed, load
+      if (
+        (propYear !== year || propMonth !== month || quizState.currentMCQs.length === 0) &&
+        lastFailedSelectionRef.current !== key
+      ) {
         loadExamDate(propYear, propMonth);
       }
       setCurrentDisplayYear(propYear);
@@ -113,10 +121,29 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   };
 
   const loadExamDate = async (selectedYear, selectedMonth) => {
+    const key = `${selectedYear}-${selectedMonth}`;
+    // If a request is already in flight, ignore
+    if (isLoadingExam) return;
+    // If we already failed this selection, do not re-request; just surface the message
+    if (lastFailedSelectionRef.current === key) {
+      setErrorMessage(`MCQs for ${selectedMonth} ${selectedYear} will be updated soon`);
+      setShowModal(true);
+      return;
+    }
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const { signal } = controller;
+
+    setIsLoadingExam(true);
     // For 2023/2024 show "will be updated soon" message immediately
     if (selectedYear === 2023 || selectedYear === 2024) {
       setIsDropdownOpen(false);
       showToast(`Data for ${selectedMonth} ${selectedYear} will be updated soon`, 'info');
+      setIsLoadingExam(false);
       return;
     }
 
@@ -131,7 +158,7 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
       setErrorMessage('');
       
       // API function will handle month lowercase conversion
-      const data = await fetchMCQsByExam(selectedYear, selectedMonth);
+      const data = await fetchMCQsByExam(selectedYear, selectedMonth, { signal });
       
       if (!data || data.length === 0) {
         throw new Error(`This Month's MCQs for ${selectedYear} will be updated soon`);
@@ -144,7 +171,12 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
       // Close modal after successful load
       setShowModal(false);
     } catch (error) {
-      showToast(error.message || 'Failed to load MCQs', 'error');
+      if (error.name === 'AbortError') return;
+      if (lastErrorKeyRef.current !== key) {
+        showToast(error.message || 'Failed to load MCQs', 'error');
+        lastErrorKeyRef.current = key;
+      }
+      lastFailedSelectionRef.current = key;
       // Reset selection so the modal stays on the same screen and show inline message
       quizState.resetState();
       setYear(null);
@@ -154,6 +186,8 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
     } finally {
       setLoadingState(false);
       setLoading(false);
+      setIsLoadingExam(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -178,10 +212,18 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
   };
 
   const handleMonthYearSelect = (y, m) => {
+    if (isLoadingExam) return;
+    const key = `${y}-${m}`;
+    // If last attempt for this selection failed, show inline and do not refetch
+    if (lastFailedSelectionRef.current === key) {
+      setErrorMessage(`MCQs for ${m} ${y} will be updated soon`);
+      setShowModal(true);
+      return;
+    }
     // Close dropdown when month is selected
     setIsDropdownOpen(false);
-    // If already on this month/year, just return
-    if (y === year && m === month) {
+    // If already on this month/year and we have MCQs, do nothing
+    if (y === year && m === month && quizState.currentMCQs.length > 0) {
       return;
     }
     loadExamDate(y, m);
@@ -446,6 +488,7 @@ function ExamWise({ year: propYear, month: propMonth, openExamSelector, onBackTo
         onClose={handleModalClose}
         onSelect={handleModalSelect}
         errorMessage={errorMessage}
+        isLoading={isLoadingExam}
       />
     );
   }
